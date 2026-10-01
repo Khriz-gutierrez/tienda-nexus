@@ -15,6 +15,9 @@ interface CartItem extends Product {
   selectedColor: string;
 }
 
+// Configuración de la URL del API para Desarrollo y Producción
+const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+
 let allProducts: Product[] = [];
 let cartItems: CartItem[] = [];
 let showForm: boolean = false;
@@ -39,7 +42,7 @@ async function loadProducts() {
   app.innerHTML = `<div class="loading">Cargando catálogo...</div>`
 
   try {
-    const res = await fetch('http://localhost:5000/api/products')
+    const res = await fetch(`${API_URL}/api/products`)
     allProducts = await res.json()
     applyFiltersAndRender()
   } catch (err) {
@@ -50,7 +53,7 @@ async function loadProducts() {
 // Crear producto enviando FormData
 async function createProduct(formData: FormData) {
   try {
-    const res = await fetch('http://localhost:5000/api/products', {
+    const res = await fetch(`${API_URL}/api/products`, {
       method: 'POST',
       body: formData
     });
@@ -70,7 +73,7 @@ async function createProduct(formData: FormData) {
 // Actualizar producto enviando FormData
 async function updateProduct(id: number, formData: FormData) {
   try {
-    const res = await fetch(`http://localhost:5000/api/products/${id}`, {
+    const res = await fetch(`${API_URL}/api/products/${id}`, {
       method: 'PUT',
       body: formData
     });
@@ -92,7 +95,7 @@ async function deleteProduct(id: number) {
   if (!confirm('¿Estás seguro de que deseas eliminar este producto?')) return;
 
   try {
-    const res = await fetch(`http://localhost:5000/api/products/${id}`, {
+    const res = await fetch(`${API_URL}/api/products/${id}`, {
       method: 'DELETE'
     });
 
@@ -114,7 +117,7 @@ function getImageUrl(imagePath: string): string {
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
-  return `http://localhost:5000${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+  return `${API_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
 }
 
 // --- MODAL DETALLE DE PRODUCTO ---
