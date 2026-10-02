@@ -15,8 +15,8 @@ interface CartItem extends Product {
   selectedColor: string;
 }
 
-// Configuración de la URL del API para Desarrollo y Producción
-const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+// Configuración de la URL del API para Producción (Render) y Desarrollo Local
+const API_URL = import.meta.env.VITE_API_URL || 'https://tienda-nexus.onrender.com';
 
 let allProducts: Product[] = [];
 let cartItems: CartItem[] = [];
@@ -27,7 +27,7 @@ let searchQuery: string = '';
 let editingProduct: Product | null = null;
 let isAdmin: boolean = false;
 
-// Datos de categorías estilo SHEIN con imágenes de muestra
+// Datos de categorías con imágenes de muestra
 const categoriesList = [
   { id: 'Todos', label: 'Ver todo', img: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=150' },
   { id: 'Hombre', label: 'Hombre', img: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?w=150' },
@@ -42,11 +42,13 @@ async function loadProducts() {
   app.innerHTML = `<div class="loading">Cargando catálogo...</div>`
 
   try {
-    const res = await fetch(`${API_URL}/api/products`)
-    allProducts = await res.json()
-    applyFiltersAndRender()
+    const res = await fetch(`${API_URL}/api/products`);
+    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+    allProducts = await res.json();
+    applyFiltersAndRender();
   } catch (err) {
-    app.innerHTML = `<div class="loading">Error al conectar con el servidor</div>`
+    console.error(err);
+    app.innerHTML = `<div class="loading">Error al conectar con el servidor API (${API_URL})</div>`;
   }
 }
 
@@ -62,7 +64,7 @@ async function createProduct(formData: FormData) {
       showForm = false;
       await loadProducts();
     } else {
-      const errData = await res.json();
+      const errData = await res.json().catch(() => ({ error: 'Error desconocido' }));
       alert(`Error al guardar: ${errData.error || 'Verifique los datos'}`);
     }
   } catch (err) {
@@ -82,7 +84,7 @@ async function updateProduct(id: number, formData: FormData) {
       editingProduct = null;
       await loadProducts();
     } else {
-      const errData = await res.json();
+      const errData = await res.json().catch(() => ({ error: 'Error desconocido' }));
       alert(`Error al actualizar: ${errData.error || 'Verifique los datos'}`);
     }
   } catch (err) {
@@ -249,16 +251,6 @@ function closeCheckoutModal() {
   if (modal) modal.classList.add('hidden');
 }
 
-document.getElementById('close-detail-modal')?.addEventListener('click', closeProductDetail);
-document.getElementById('close-checkout-modal')?.addEventListener('click', closeCheckoutModal);
-
-window.addEventListener('click', (e) => {
-  const detailModal = document.getElementById('product-detail-modal');
-  const checkoutModal = document.getElementById('checkout-modal');
-  if (e.target === detailModal) closeProductDetail();
-  if (e.target === checkoutModal) closeCheckoutModal();
-});
-
 // Aplicar filtros
 function applyFiltersAndRender() {
   let filtered = allProducts;
@@ -320,7 +312,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         </div>
       </header>
 
-      <!-- SECCIÓN COMPRAR POR CATEGORÍA ESTILO SHEIN -->
+      <!-- SECCIÓN COMPRAR POR CATEGORÍA -->
       <section class="shein-categories-section">
         <h2 class="shein-categories-title">COMPRAR POR CATEGORÍA</h2>
         <div class="shein-categories-grid">
@@ -434,7 +426,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
   // --- REGISTRO DE EVENTOS ---
 
-  // Evento de selección de categorías estilo SHEIN
+  // Evento de selección de categorías
   document.querySelectorAll('.shein-category-card').forEach(card => {
     card.addEventListener('click', (e) => {
       const cat = (e.currentTarget as HTMLElement).getAttribute('data-category');
@@ -598,4 +590,16 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   });
 }
 
+// Configuración de eventos modales estáticos en el HTML
+document.getElementById('close-detail-modal')?.addEventListener('click', closeProductDetail);
+document.getElementById('close-checkout-modal')?.addEventListener('click', closeCheckoutModal);
+
+window.addEventListener('click', (e) => {
+  const detailModal = document.getElementById('product-detail-modal');
+  const checkoutModal = document.getElementById('checkout-modal');
+  if (e.target === detailModal) closeProductDetail();
+  if (e.target === checkoutModal) closeCheckoutModal();
+});
+
+// Inicializar la aplicación
 loadProducts();
