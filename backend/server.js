@@ -6,9 +6,13 @@ const { Pool } = require('pg');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'nexusgear_clave_secreta_super_segura_2026';
+const JWT_EXPIRES = process.env.JWT_EXPIRES || '7d';
 
 // Middleware
 app.use(cors());
@@ -19,7 +23,7 @@ app.use(express.json());
 // ----------------------------------------------------
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -47,13 +51,39 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT,
-  ssl: { rejectUnauthorized: false }
+  ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
 });
 
+// ----------------------------------------------------
+// MIDDLEWARES DE AUTENTICACIÓN Y ROLES
+// ----------------------------------------------------
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
+  try {
+    const token = header.split(' ')[1];
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+}
+
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Acceso denegado: Se requieren permisos de administrador' });
+  }
+  next();
+}
+
+// ----------------------------------------------------
 // INICIALIZACIÓN DE LA BASE DE DATOS
+// ----------------------------------------------------
 async function initDB() {
   try {
-    // 1. Crear la tabla si no existe
+    // 1. Crear la tabla de productos si no existe
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
@@ -66,13 +96,25 @@ async function initDB() {
       );
     `);
 
-    // 2. Asegurar columnas de tallas y colores si la tabla ya existía
+    // 2. Crear la tabla de usuarios
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(150) UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role VARCHAR(20) DEFAULT 'customer',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // 3. Asegurar columnas de tallas y colores en productos
     await pool.query(`
       ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes VARCHAR(100);
       ALTER TABLE products ADD COLUMN IF NOT EXISTS colors VARCHAR(100);
     `);
 
-    // 3. Poblar catálogo inicial solo si está vacía
+    // 4. Poblar catálogo inicial solo si está vacía la tabla products
     const { rows } = await pool.query('SELECT COUNT(*) FROM products');
     if (parseInt(rows[0].count) === 0) {
       await pool.query(`
@@ -100,10 +142,93 @@ async function initDB() {
 initDB();
 
 // ----------------------------------------------------
-// RUTAS API (Endpoints)
+// RUTAS DE AUTENTICACIÓN (AUTH)
 // ----------------------------------------------------
 
-// Obtener todos los productos (GET)
+// Registrar un nuevo usuario (POST)
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+    }
+
+    const userCheck = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ error: 'El correo ya se encuentra registrado' });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    const newUser = await pool.query(
+      'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
+      [name, email, password_hash, 'customer']
+    );
+
+    const user = newUser.rows[0];
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES }
+    );
+
+    res.status(201).json({ user, token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Iniciar sesión (POST)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Por favor ingresa correo y contraseña' });
+    }
+
+    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (!rows.length) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const user = rows[0];
+    const passwordOk = await bcrypt.compare(password, user.password_hash);
+    if (!passwordOk) {
+      return res.status(401).json({ error: 'Credenciales inválidas' });
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES }
+    );
+
+    res.json({
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      token
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Obtener datos del usuario actual autenticado (GET)
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT id, name, email, role FROM users WHERE id = $1', [req.user.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// RUTAS API PRODUCTOS
+// ----------------------------------------------------
+
+// Obtener todos los productos (Público)
 app.get('/api/products', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM products ORDER BY id');
@@ -113,7 +238,7 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// Obtener un solo producto (GET)
+// Obtener un solo producto (Público)
 app.get('/api/products/:id', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
@@ -123,8 +248,8 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// Crear producto con subida de archivo (POST)
-app.post('/api/products', upload.single('image'), async (req, res) => {
+// Crear producto (Protegido - Solo Admin)
+app.post('/api/products', requireAuth, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     const { name, price, category, sizes, colors } = req.body;
     
@@ -145,8 +270,8 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
   }
 });
 
-// Actualizar producto (PUT)
-app.put('/api/products/:id', upload.single('image'), async (req, res) => {
+// Actualizar producto (Protegido - Solo Admin)
+app.put('/api/products/:id', requireAuth, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, price, category, sizes, colors } = req.body;
@@ -171,8 +296,8 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
   }
 });
 
-// Eliminar producto (DELETE)
-app.delete('/api/products/:id', async (req, res) => {
+// Eliminar producto (Protegido - Solo Admin)
+app.delete('/api/products/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
     res.json({ message: 'Producto eliminado' });
@@ -187,7 +312,8 @@ app.delete('/api/products/:id', async (req, res) => {
 const frontendDist = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
-  app.get('*', (req, res) => {
+  // Usar app.use como fallback para evitar el error de sintaxis en Express 5
+  app.use((req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
 }

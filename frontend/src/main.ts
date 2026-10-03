@@ -1,4 +1,6 @@
 import './style.css'
+import { getToken, getCurrentUser, logout, type User } from './auth'
+import { initAuthUI, openAuthModal } from './ui-auth'
 
 interface Product {
   id: number;
@@ -18,6 +20,7 @@ interface CartItem extends Product {
 // Configuración de la URL del API para Producción (Render) y Desarrollo Local
 const API_URL = import.meta.env.VITE_API_URL || 'https://tienda-nexus.onrender.com';
 
+let currentUser: User | null = null;
 let allProducts: Product[] = [];
 let cartItems: CartItem[] = [];
 let showForm: boolean = false;
@@ -36,6 +39,13 @@ const categoriesList = [
   { id: 'Accesorios', label: 'Accesorios', img: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=150' }
 ];
 
+// Verificar Estado del Usuario
+async function checkUserSession() {
+  currentUser = await getCurrentUser();
+  isAdmin = currentUser?.role === 'admin';
+  applyFiltersAndRender();
+}
+
 // Cargar catálogo
 async function loadProducts() {
   const app = document.querySelector<HTMLDivElement>('#app')!
@@ -52,11 +62,21 @@ async function loadProducts() {
   }
 }
 
-// Crear producto enviando FormData
+// Crear producto enviando FormData con Token JWT
 async function createProduct(formData: FormData) {
+  const token = getToken();
+  if (!token) {
+    alert('Debes iniciar sesión como Administrador.');
+    openAuthModal();
+    return;
+  }
+
   try {
     const res = await fetch(`${API_URL}/api/products`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     });
 
@@ -72,11 +92,21 @@ async function createProduct(formData: FormData) {
   }
 }
 
-// Actualizar producto enviando FormData
+// Actualizar producto enviando FormData con Token JWT
 async function updateProduct(id: number, formData: FormData) {
+  const token = getToken();
+  if (!token) {
+    alert('Debes iniciar sesión como Administrador.');
+    openAuthModal();
+    return;
+  }
+
   try {
     const res = await fetch(`${API_URL}/api/products/${id}`, {
       method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData
     });
 
@@ -92,13 +122,23 @@ async function updateProduct(id: number, formData: FormData) {
   }
 }
 
-// Eliminar producto
+// Eliminar producto con Token JWT
 async function deleteProduct(id: number) {
+  const token = getToken();
+  if (!token) {
+    alert('Debes iniciar sesión como Administrador.');
+    openAuthModal();
+    return;
+  }
+
   if (!confirm('¿Estás seguro de que deseas eliminar este producto?')) return;
 
   try {
     const res = await fetch(`${API_URL}/api/products/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
     });
 
     if (res.ok) {
@@ -106,7 +146,8 @@ async function deleteProduct(id: number) {
       cartItems = cartItems.filter(p => p.id !== id);
       applyFiltersAndRender();
     } else {
-      alert('Error al eliminar el producto.');
+      const errData = await res.json().catch(() => ({ error: 'Error al eliminar' }));
+      alert(`Error: ${errData.error || 'No fue posible eliminar el producto'}`);
     }
   } catch (err) {
     alert('Error de red al intentar eliminar.');
@@ -206,8 +247,8 @@ function openCheckoutModal() {
     <p class="detail-price">Total a pagar: $${total.toFixed(2)}</p>
     
     <form id="checkout-form" style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
-      <input type="text" id="cust-name" placeholder="Nombre completo" required />
-      <input type="email" id="cust-email" placeholder="Correo electrónico" required />
+      <input type="text" id="cust-name" placeholder="Nombre completo" value="${currentUser ? currentUser.name : ''}" required />
+      <input type="email" id="cust-email" placeholder="Correo electrónico" value="${currentUser ? currentUser.email : ''}" required />
       <input type="text" id="cust-address" placeholder="Dirección de envío" required />
       <select id="payment-method" required>
         <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
@@ -292,9 +333,18 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           </div>
           
           <div class="navbar-actions">
-            <button id="btn-toggle-role" class="btn-role-toggle" style="background:#222; color:white; padding:8px 12px; border-radius:6px; border:none; cursor:pointer;">
-              ${isAdmin ? '👑 Modo Admin' : '👤 Modo Cliente'}
-            </button>
+            ${currentUser ? `
+              <span style="font-size:14px; font-weight:bold; align-self:center;">
+                👤 ${currentUser.name}${isAdmin ? '(Admin)' : ''}
+              </span>
+              <button id="btn-logout" style="background:#dc3545; color:white; padding:8px 12px; border-radius:6px; border:none; cursor:pointer;">
+                Salir
+              </button>
+            ` : `
+              <button id="btn-open-auth" style="background:#007bff; color:white; padding:8px 12px; border-radius:6px; border:none; cursor:pointer;">
+                🔑 Iniciar Sesión
+              </button>
+            `}
 
             ${isAdmin ? `
               <button id="btn-toggle-form" class="btn-add-product">
@@ -424,7 +474,9 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     </div>
   `
 
-  // --- REGISTRO DE EVENTOS ---
+  // --- REGISTRO DE EVENTOS DE SESIÓN Y MODAL ---
+  document.querySelector('#btn-open-auth')?.addEventListener('click', openAuthModal);
+  document.querySelector('#btn-logout')?.addEventListener('click', logout);
 
   // Evento de selección de categorías
   document.querySelectorAll('.shein-category-card').forEach(card => {
@@ -450,15 +502,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   // Evento Botón Proceder al Pago
   document.querySelector('#btn-go-checkout')?.addEventListener('click', () => {
     openCheckoutModal();
-  });
-
-  // Toggle Rol
-  document.querySelector('#btn-toggle-role')?.addEventListener('click', () => {
-    isAdmin = !isAdmin;
-    showForm = false;
-    showCart = false;
-    editingProduct = null;
-    applyFiltersAndRender();
   });
 
   // Búsqueda
@@ -601,5 +644,10 @@ window.addEventListener('click', (e) => {
   if (e.target === checkoutModal) closeCheckoutModal();
 });
 
-// Inicializar la aplicación
+// Inicializar Módulo Autenticación UI y Cargar la Aplicación
+initAuthUI(() => {
+  checkUserSession();
+});
+
+checkUserSession();
 loadProducts();
