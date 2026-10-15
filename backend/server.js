@@ -4,8 +4,6 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -19,28 +17,9 @@ app.use(cors());
 app.use(express.json());
 
 // ----------------------------------------------------
-// CONFIGURACIÓN DE MULTER (Subida local de imágenes)
+// CONFIGURACIÓN DE MULTER (Almacenamiento en Memoria para Base64)
 // ----------------------------------------------------
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-  }
-});
-
-const upload = multer({ storage: storage });
-
-// Hacer pública la carpeta uploads para poder ver las fotos en el navegador
-app.use('/uploads', express.static(uploadDir));
+const upload = multer({ storage: multer.memoryStorage() });
 
 // ----------------------------------------------------
 // CONFIGURACIÓN DE CONEXIÓN A POSTGRESQL (Clever Cloud)
@@ -255,7 +234,8 @@ app.post('/api/products', requireAuth, requireAdmin, upload.single('image'), asy
     
     let imageUrl = '';
     if (req.file) {
-      imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      const b64 = Buffer.from(req.file.buffer).toString('base64');
+      imageUrl = `data:${req.file.mimetype};base64,${b64}`;
     } else {
       imageUrl = req.body.image || 'https://via.placeholder.com/300';
     }
@@ -278,7 +258,8 @@ app.put('/api/products/:id', requireAuth, requireAdmin, upload.single('image'), 
 
     let imageUrl = req.body.image;
     if (req.file) {
-      imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      const b64 = Buffer.from(req.file.buffer).toString('base64');
+      imageUrl = `data:${req.file.mimetype};base64,${b64}`;
     }
 
     const { rows } = await pool.query(
@@ -312,7 +293,6 @@ app.delete('/api/products/:id', requireAuth, requireAdmin, async (req, res) => {
 const frontendDist = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
-  // Usar app.use como fallback para evitar el error de sintaxis en Express 5
   app.use((req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
