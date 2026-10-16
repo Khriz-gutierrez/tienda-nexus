@@ -173,6 +173,9 @@ function openProductDetail(product: Product) {
 
   if (!modal || !modalBody) return;
 
+  // Excepción: Si es de categoría Accesorios, no requiere tallas
+  const isAccesorios = product.category === 'Accesorios';
+
   const sizesArray = product.sizes ? product.sizes.split(',').map(s => s.trim()) : ['S', 'M', 'L'];
   const colorsArray = product.colors ? product.colors.split(',').map(c => c.trim()) : ['Estándar'];
 
@@ -186,12 +189,14 @@ function openProductDetail(product: Product) {
         <p class="detail-price">$${parseFloat(product.price).toFixed(2)}</p>
         <p><strong>Categoría:</strong> ${product.category}</p>
         
-        <div class="variant-selector">
-          <label for="select-size">Seleccionar Talla:</label>
-          <select id="select-size">
-            ${sizesArray.map(size => `<option value="${size}">${size}</option>`).join('')}
-          </select>
-        </div>
+        ${!isAccesorios ? `
+          <div class="variant-selector">
+            <label for="select-size">Seleccionar Talla:</label>
+            <select id="select-size">
+              ${sizesArray.map(size => `<option value="${size}">${size}</option>`).join('')}
+            </select>
+          </div>
+        ` : ''}
 
         <div class="variant-selector">
           <label for="select-color">Seleccionar Color:</label>
@@ -212,7 +217,8 @@ function openProductDetail(product: Product) {
   const addBtn = modalBody.querySelector('#btn-add-modal-cart');
   if (addBtn) {
     addBtn.addEventListener('click', () => {
-      const selectedSize = (document.getElementById('select-size') as HTMLSelectElement).value;
+      const sizeSelect = document.getElementById('select-size') as HTMLSelectElement | null;
+      const selectedSize = sizeSelect ? sizeSelect.value : 'Única';
       const selectedColor = (document.getElementById('select-color') as HTMLSelectElement).value;
 
       cartItems.push({
@@ -410,7 +416,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           <form id="add-product-form">
             <input type="text" id="p-name" placeholder="Nombre del producto" required />
             <input type="number" step="0.01" id="p-price" placeholder="Precio ($)" required />
-            <input type="text" id="p-sizes" placeholder="Tallas (ej: S, M, L, XL)" />
+            <input type="text" id="p-sizes" placeholder="Tallas (ej: S, M, L, XL - Opcional)" />
             <input type="text" id="p-colors" placeholder="Colores (ej: Negro, Azul, Rojo)" />
             <select id="p-category">
               <option value="Hombre">Hombre</option>
@@ -434,7 +440,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           <form id="edit-product-form">
             <input type="text" id="edit-p-name" value="${editingProduct.name}" required />
             <input type="number" step="0.01" id="edit-p-price" value="${editingProduct.price}" required />
-            <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas (ej: S, M, L, XL)" />
+            <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas (ej: S, M, L, XL - Opcional)" />
             <input type="text" id="edit-p-colors" value="${editingProduct.colors || ''}" placeholder="Colores (ej: Negro, Azul, Rojo)" />
             <select id="edit-p-category">
               <option value="Hombre" ${editingProduct.category === 'Hombre' ? 'selected' : ''}>Hombre</option>
@@ -602,8 +608,10 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
       const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
       const product = allProducts.find(p => p.id === id);
       if (product) {
-        const defaultSize = product.sizes ? product.sizes.split(',')[0].trim() : 'M';
+        const isAccesorios = product.category === 'Accesorios';
+        const defaultSize = isAccesorios ? 'Única' : (product.sizes ? product.sizes.split(',')[0].trim() : 'M');
         const defaultColor = product.colors ? product.colors.split(',')[0].trim() : 'Único';
+        
         cartItems.push({ ...product, selectedSize: defaultSize, selectedColor: defaultColor });
         applyFiltersAndRender();
       }
