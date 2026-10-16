@@ -62,8 +62,8 @@ async function loadProducts() {
   }
 }
 
-// Crear producto enviando FormData con Token JWT
-async function createProduct(formData: FormData) {
+// Crear producto enviando JSON con Token JWT
+async function createProduct(productData: { name: string; price: string; sizes: string; colors: string; category: string; image: string }) {
   const token = getToken();
   if (!token) {
     alert('Debes iniciar sesión como Administrador.');
@@ -75,9 +75,10 @@ async function createProduct(formData: FormData) {
     const res = await fetch(`${API_URL}/api/products`, {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: formData
+      body: JSON.stringify(productData)
     });
 
     if (res.ok) {
@@ -92,8 +93,8 @@ async function createProduct(formData: FormData) {
   }
 }
 
-// Actualizar producto enviando FormData con Token JWT
-async function updateProduct(id: number, formData: FormData) {
+// Actualizar producto enviando JSON con Token JWT
+async function updateProduct(id: number, productData: { name: string; price: string; sizes: string; colors: string; category: string; image: string }) {
   const token = getToken();
   if (!token) {
     alert('Debes iniciar sesión como Administrador.');
@@ -105,9 +106,10 @@ async function updateProduct(id: number, formData: FormData) {
     const res = await fetch(`${API_URL}/api/products/${id}`, {
       method: 'PUT',
       headers: {
+        'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: formData
+      body: JSON.stringify(productData)
     });
 
     if (res.ok) {
@@ -154,7 +156,7 @@ async function deleteProduct(id: number) {
   }
 }
 
-// Helper para construir la URL completa de la imagen
+// Helper para construir la URL de la imagen
 function getImageUrl(imagePath: string): string {
   if (!imagePath) return '';
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
@@ -387,7 +389,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
                 <li>
                   <div>
                     <strong>${item.name}</strong><br/>
-                    <small>Talla: ${item.selectedSize} | Color: ${item.selectedColor}</small><br/>                     <span>$${parseFloat(item.price).toFixed(2)}</span>
+                    <small>Talla: ${item.selectedSize} | Color: ${item.selectedColor}</small><br/> <span>$${parseFloat(item.price).toFixed(2)}</span>
                   </div>
                   <button class="remove-cart-item-btn" data-index="${idx}">X</button>
                 </li>
@@ -401,11 +403,11 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         </div>
       ` : ''}
 
-      <!-- Formulario Crear (Admin) -->
+      <!-- Formulario Crear (Admin) - Campo de Imagen por URL -->
       ${showForm && isAdmin ? `
         <div class="form-container">
           <h2>Añadir Nuevo Producto</h2>
-          <form id="add-product-form" enctype="multipart/form-data">
+          <form id="add-product-form">
             <input type="text" id="p-name" placeholder="Nombre del producto" required />
             <input type="number" step="0.01" id="p-price" placeholder="Precio ($)" required />
             <input type="text" id="p-sizes" placeholder="Tallas (ej: S, M, L, XL)" />
@@ -417,19 +419,19 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
               <option value="Accesorios">Accesorios</option>
             </select>
             <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-              <label for="p-image" style="font-size:0.85rem; font-weight:600;">Imagen del producto:</label>
-              <input type="file" id="p-image" accept="image/*" required />
+              <label for="p-image" style="font-size:0.85rem; font-weight:600;">Enlace directo de ImgBB:</label>
+              <input type="text" id="p-image" placeholder="https://i.ibb.co/..." required />
             </div>
             <button type="submit" class="btn-submit">Guardar Producto</button>
           </form>
         </div>
       ` : ''}
 
-      <!-- Formulario Editar (Admin) -->
+      <!-- Formulario Editar (Admin) - Campo de Imagen por URL -->
       ${editingProduct && isAdmin ? `
         <div class="form-container edit-container">
           <h2>Editar Producto</h2>
-          <form id="edit-product-form" enctype="multipart/form-data">
+          <form id="edit-product-form">
             <input type="text" id="edit-p-name" value="${editingProduct.name}" required />
             <input type="number" step="0.01" id="edit-p-price" value="${editingProduct.price}" required />
             <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas (ej: S, M, L, XL)" />
@@ -441,8 +443,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
               <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
             </select>
             <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-              <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">Cambiar imagen (opcional):</label>
-              <input type="file" id="edit-p-image" accept="image/*" />
+              <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">Enlace directo de ImgBB:</label>
+              <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" placeholder="https://i.ibb.co/..." required />
             </div>
             <div style="display:flex; gap:10px; margin-top:10px;">
               <button type="submit" class="btn-submit" style="flex:1;">Actualizar</button>
@@ -458,7 +460,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           <div class="product-card">
             <img src="${getImageUrl(p.image)}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
             <h3 class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;">${p.name}</h3>
-            <p class="category">${p.category}</p>             <p class="price">$${parseFloat(p.price).toFixed(2)}</p>
+            <p class="category">${p.category}</p> <p class="price">$${parseFloat(p.price).toFixed(2)}</p>
             
             <div class="card-actions">
               ${!isAdmin ? `
@@ -535,48 +537,42 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     applyFiltersAndRender();
   });
 
-  // Formulario Crear Producto
+  // Formulario Crear Producto (Envía URL de ImgBB)
   const form = document.querySelector('#add-product-form');
   if (form) {
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       
-      const formData = new FormData();
-      formData.append('name', (document.querySelector('#p-name') as HTMLInputElement).value);
-      formData.append('price', (document.querySelector('#p-price') as HTMLInputElement).value);
-      formData.append('sizes', (document.querySelector('#p-sizes') as HTMLInputElement).value);
-      formData.append('colors', (document.querySelector('#p-colors') as HTMLInputElement).value);
-      formData.append('category', (document.querySelector('#p-category') as HTMLSelectElement).value);
+      const productData = {
+        name: (document.querySelector('#p-name') as HTMLInputElement).value,
+        price: (document.querySelector('#p-price') as HTMLInputElement).value,
+        sizes: (document.querySelector('#p-sizes') as HTMLInputElement).value,
+        colors: (document.querySelector('#p-colors') as HTMLInputElement).value,
+        category: (document.querySelector('#p-category') as HTMLSelectElement).value,
+        image: (document.querySelector('#p-image') as HTMLInputElement).value
+      };
 
-      const fileInput = document.querySelector('#p-image') as HTMLInputElement;
-      if (fileInput.files && fileInput.files[0]) {
-        formData.append('image', fileInput.files[0]);
-      }
-
-      createProduct(formData);
+      createProduct(productData);
     });
   }
 
-  // Formulario Editar Producto
+  // Formulario Editar Producto (Envía URL de ImgBB)
   const editForm = document.querySelector('#edit-product-form');
   if (editForm && editingProduct) {
     const idToUpdate = editingProduct.id;
     editForm.addEventListener('submit', (e) => {
       e.preventDefault();
 
-      const formData = new FormData();
-      formData.append('name', (document.querySelector('#edit-p-name') as HTMLInputElement).value);
-      formData.append('price', (document.querySelector('#edit-p-price') as HTMLInputElement).value);
-      formData.append('sizes', (document.querySelector('#edit-p-sizes') as HTMLInputElement).value);
-      formData.append('colors', (document.querySelector('#edit-p-colors') as HTMLInputElement).value);
-      formData.append('category', (document.querySelector('#edit-p-category') as HTMLSelectElement).value);
+      const productData = {
+        name: (document.querySelector('#edit-p-name') as HTMLInputElement).value,
+        price: (document.querySelector('#edit-p-price') as HTMLInputElement).value,
+        sizes: (document.querySelector('#edit-p-sizes') as HTMLInputElement).value,
+        colors: (document.querySelector('#edit-p-colors') as HTMLInputElement).value,
+        category: (document.querySelector('#edit-p-category') as HTMLSelectElement).value,
+        image: (document.querySelector('#edit-p-image') as HTMLInputElement).value
+      };
 
-      const fileInput = document.querySelector('#edit-p-image') as HTMLInputElement;
-      if (fileInput.files && fileInput.files[0]) {
-        formData.append('image', fileInput.files[0]);
-      }
-
-      updateProduct(idToUpdate, formData);
+      updateProduct(idToUpdate, productData);
     });
 
     document.querySelector('#btn-cancel-edit')?.addEventListener('click', () => {

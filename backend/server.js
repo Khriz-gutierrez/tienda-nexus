@@ -3,7 +3,8 @@ require('dotenv').config(); // Cargar variables de entorno desde el archivo .env
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -16,11 +17,6 @@ const JWT_EXPIRES = process.env.JWT_EXPIRES || '7d';
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
-// ----------------------------------------------------
-// CONFIGURACIÓN DE MULTER (Almacenamiento en Memoria para Base64)
-// ----------------------------------------------------
-const upload = multer({ storage: multer.memoryStorage() });
 
 // ----------------------------------------------------
 // CONFIGURACIÓN DE CONEXIÓN A POSTGRESQL (Clever Cloud)
@@ -125,7 +121,6 @@ initDB();
 // RUTAS DE AUTENTICACIÓN (AUTH)
 // ----------------------------------------------------
 
-// Registrar un nuevo usuario (POST)
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -159,7 +154,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Iniciar sesión (POST)
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -193,7 +187,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Obtener datos del usuario actual autenticado (GET)
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT id, name, email, role FROM users WHERE id = $1', [req.user.id]);
@@ -205,10 +198,9 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 // ----------------------------------------------------
-// RUTAS API PRODUCTOS
+// RUTAS API PRODUCTOS (Reciben la URL directamente)
 // ----------------------------------------------------
 
-// Obtener todos los productos (Público)
 app.get('/api/products', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM products ORDER BY id');
@@ -218,7 +210,6 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-// Obtener un solo producto (Público)
 app.get('/api/products/:id', async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
@@ -229,17 +220,11 @@ app.get('/api/products/:id', async (req, res) => {
 });
 
 // Crear producto (Protegido - Solo Admin)
-app.post('/api/products', requireAuth, requireAdmin, upload.single('image'), async (req, res) => {
+app.post('/api/products', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { name, price, category, sizes, colors } = req.body;
+    const { name, price, category, image, sizes, colors } = req.body;
     
-    let imageUrl = '';
-    if (req.file) {
-      const b64 = Buffer.from(req.file.buffer).toString('base64');
-      imageUrl = `data:${req.file.mimetype};base64,${b64}`;
-    } else {
-      imageUrl = req.body.image || 'https://via.placeholder.com/300';
-    }
+    const imageUrl = image || 'https://via.placeholder.com/300';
 
     const { rows } = await pool.query(
       'INSERT INTO products (name, price, category, image, sizes, colors) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
@@ -252,16 +237,12 @@ app.post('/api/products', requireAuth, requireAdmin, upload.single('image'), asy
 });
 
 // Actualizar producto (Protegido - Solo Admin)
-app.put('/api/products/:id', requireAuth, requireAdmin, upload.single('image'), async (req, res) => {
+app.put('/api/products/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, category, sizes, colors } = req.body;
+    const { name, price, category, image, sizes, colors } = req.body;
 
-    let imageUrl = req.body.image;
-    if (req.file) {
-      const b64 = Buffer.from(req.file.buffer).toString('base64');
-      imageUrl = `data:${req.file.mimetype};base64,${b64}`;
-    }
+    const imageUrl = image || 'https://via.placeholder.com/300';
 
     const { rows } = await pool.query(
       'UPDATE products SET name = $1, price = $2, category = $3, image = $4, sizes = $5, colors = $6 WHERE id = $7 RETURNING *',
@@ -278,7 +259,6 @@ app.put('/api/products/:id', requireAuth, requireAdmin, upload.single('image'), 
   }
 });
 
-// Eliminar producto (Protegido - Solo Admin)
 app.delete('/api/products/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
