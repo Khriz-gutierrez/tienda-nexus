@@ -14,7 +14,8 @@ const JWT_EXPIRES = process.env.JWT_EXPIRES || '7d';
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ----------------------------------------------------
 // CONFIGURACIÓN DE MULTER (Almacenamiento en Memoria para Base64)
