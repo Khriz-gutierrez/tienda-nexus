@@ -537,7 +537,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     applyFiltersAndRender();
   });
 
-  // Formulario Crear Producto (Envía URL de ImgBB)
+  // Formulario Crear Producto
   const form = document.querySelector('#add-product-form');
   if (form) {
     form.addEventListener('submit', (e) => {
@@ -556,7 +556,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   }
 
-  // Formulario Editar Producto (Envía URL de ImgBB)
+  // Formulario Editar Producto
   const editForm = document.querySelector('#edit-product-form');
   if (editForm && editingProduct) {
     const idToUpdate = editingProduct.id;
