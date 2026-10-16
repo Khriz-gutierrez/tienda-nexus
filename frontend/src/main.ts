@@ -419,8 +419,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
               <option value="Accesorios">Accesorios</option>
             </select>
             <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-              <label for="p-image" style="font-size:0.85rem; font-weight:600;">Enlace directo de ImgBB:</label>
-              <input type="text" id="p-image" placeholder="https://i.ibb.co/..." required />
+              <label for="p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
+              <input type="text" id="p-image" placeholder="Ej: https://..." required />
             </div>
             <button type="submit" class="btn-submit">Guardar Producto</button>
           </form>
@@ -443,8 +443,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
               <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
             </select>
             <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-              <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">Enlace directo de ImgBB:</label>
-              <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" placeholder="https://i.ibb.co/..." required />
+              <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
+              <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" placeholder="Ej: https://..." required />
             </div>
             <div style="display:flex; gap:10px; margin-top:10px;">
               <button type="submit" class="btn-submit" style="flex:1;">Actualizar</button>
