@@ -29,8 +29,9 @@ let currentCategory: string = 'Todos';
 let searchQuery: string = '';
 let editingProduct: Product | null = null;
 let isAdmin: boolean = false;
+let activeTab: 'catalog' | 'dashboard' = 'catalog'; // Controla si se ve la tienda o el dashboard de reportes
 
-// Datos de categorías con imágenes de muestra
+// Datos de categorías con imágenes de muestra para previsualización
 const categoriesList = [
   { id: 'Todos', label: 'Ver todo', img: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=150' },
   { id: 'Hombre', label: 'Hombre', img: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?w=150' },
@@ -173,9 +174,7 @@ function openProductDetail(product: Product) {
 
   if (!modal || !modalBody) return;
 
-  // Excepción: Si es de categoría Accesorios, no requiere tallas
   const isAccesorios = product.category === 'Accesorios';
-
   const sizesArray = product.sizes ? product.sizes.split(',').map(s => s.trim()) : ['S', 'M', 'L'];
   const colorsArray = product.colors ? product.colors.split(',').map(c => c.trim()) : ['Estándar'];
 
@@ -319,15 +318,72 @@ function applyFiltersAndRender() {
   renderApp(filtered, currentCategory);
 }
 
-// Renderizado principal
+// Renderizado principal del Panel de Reportes (Dashboard Admin)
+function renderDashboardMetrics() {
+  const totalProducts = allProducts.length;
+  const totalValue = allProducts.reduce((sum, p) => sum + parseFloat(p.price || '0'), 0);
+
+  const categoryCounts = allProducts.reduce((acc: Record<string, number>, p) => {
+    acc[p.category] = (acc[p.category] || 0) + 1;
+    return acc;
+  }, {});
+
+  return `
+    <div class="dashboard-container">
+      <h2>📊 Panel de Control y Reportes (Admin)</h2>
+      
+      <!-- Tarjetas de Métricas -->
+      <div class="dashboard-cards-grid">
+        <div class="metric-card">
+          <h3>Total de Productos</h3>
+          <p class="metric-value">${totalProducts}</p>
+        </div>
+        <div class="metric-card">
+          <h3>Valor del Catálogo</h3>
+          <p class="metric-value">$${totalValue.toFixed(2)}</p>
+        </div>
+        <div class="metric-card">
+          <h3>Categorías Activas</h3>
+          <p class="metric-value">${Object.keys(categoryCounts).length}</p>
+        </div>
+      </div>
+
+      <!-- Reporte por Categoría -->
+      <div class="report-section">
+        <h3>Reporte de Productos por Categoría</h3>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Categoría</th>
+              <th>Cantidad de Productos</th>
+              <th>Porcentaje del Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(categoryCounts).map(([cat, count]) => `
+              <tr>
+                <td><strong>${cat}</strong></td>
+                <td>${count}</td>
+                <td>${totalProducts > 0 ? ((count / totalProducts) * 100).toFixed(1) : 0}%</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// Renderizado principal con Navbar reorganizado en 2 filas
 function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   const app = document.querySelector<HTMLDivElement>('#app')!
   const cartTotal = cartItems.reduce((acc, p) => acc + parseFloat(p.price), 0);
 
   app.innerHTML = `
     <div class="App">
-      <!-- Encabezado Estilo SHEIN -->
+      <!-- Encabezado con Estilo Boutique de 2 Filas -->
       <header class="navbar-container">
+        <!-- FILA 1: Logo, Buscador y Acciones del Usuario -->
         <div class="navbar-top">
           <h1 class="brand-logo">NEXUSGEAR</h1>
 
@@ -335,30 +391,24 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
             <input 
               type="text" 
               id="search-input" 
-              placeholder="Buscar productos..." 
+              placeholder="Buscar productos en NexusGear..." 
               value="${searchQuery}" 
             />
           </div>
           
           <div class="navbar-actions">
             ${currentUser ? `
-              <span style="font-size:14px; font-weight:bold; align-self:center;">
-                👤 ${currentUser.name}${isAdmin ? '(Admin)' : ''}
+              <span class="user-badge-name">
+                👤 ${currentUser.name}${isAdmin ? ' (Admin)' : ''}
               </span>
-              <button id="btn-logout" style="background:#dc3545; color:white; padding:8px 12px; border-radius:6px; border:none; cursor:pointer;">
+              <button id="btn-logout" class="btn-logout-red">
                 Salir
               </button>
             ` : `
-              <button id="btn-open-auth" style="background:#007bff; color:white; padding:8px 12px; border-radius:6px; border:none; cursor:pointer;">
+              <button id="btn-open-auth" class="btn-login-blue">
                 🔑 Iniciar Sesión
               </button>
             `}
-
-            ${isAdmin ? `
-              <button id="btn-toggle-form" class="btn-add-product">
-                ${showForm ? '✕ Cerrar' : '+ Nuevo Producto'}
-              </button>
-            ` : ''}
             
             ${!isAdmin ? `
               <div id="btn-toggle-cart" class="cart-icon-container">
@@ -368,127 +418,143 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
             ` : ''}
           </div>
         </div>
-      </header>
 
-      <!-- SECCIÓN COMPRAR POR CATEGORÍA -->
-      <section class="shein-categories-section">
-        <h2 class="shein-categories-title">COMPRAR POR CATEGORÍA</h2>
-        <div class="shein-categories-grid">
-          ${categoriesList.map(cat => `
-            <div class="shein-category-card ${cat.id === selectedCategory ? 'active' : ''}" data-category="${cat.id}">
-              <div class="shein-category-img-wrapper">
-                <img src="${cat.img}" alt="${cat.label}">
-              </div>
-              <span class="shein-category-label">${cat.label}</span>
-            </div>
-          `).join('')}
-        </div>
-      </section>
-
-      <!-- Carrito Ventana Flotante -->
-      ${showCart && !isAdmin ? `
-        <div class="cart-modal">
-          <h3>Tu Carrito</h3>
-          ${cartItems.length === 0 ? '<p>El carrito está vacío.</p>' : `
-            <ul class="cart-list">
-              ${cartItems.map((item, idx) => `
-                <li>
-                  <div>
-                    <strong>${item.name}</strong><br/>
-                    <small>Talla: ${item.selectedSize} | Color: ${item.selectedColor}</small><br/> <span>$${parseFloat(item.price).toFixed(2)}</span>
-                  </div>
-                  <button class="remove-cart-item-btn" data-index="${idx}">X</button>
-                </li>
+        <!-- FILA 2: Menú Desplegable de Categorías (Hover) y Herramientas Admin -->
+        <div class="navbar-subnav">
+          <div class="categories-dropdown-container">
+            <button id="btn-categories-toggle" class="categories-toggle-btn">
+              Categorías ▾
+            </button>
+            <div id="categories-dropdown-menu" class="categories-dropdown-content">
+              ${categoriesList.map(cat => `
+                <div class="dropdown-category-item ${cat.id === selectedCategory ? 'active' : ''}" data-category="${cat.id}">
+                  <img src="${cat.img}" alt="${cat.label}" class="dropdown-cat-thumb" />
+                  <span>${cat.label}</span>
+                </div>
               `).join('')}
-            </ul>
-            <hr />
-            <p class="cart-total"><strong>Total:</strong> $${cartTotal.toFixed(2)}</p>
-            <button id="btn-go-checkout" class="btn-checkout">Proceder al Pago</button>
-          `}
-          <button id="btn-close-cart" class="btn-submit" style="margin-top:8px; width:100%; background-color:#718096;">Cerrar</button>
-        </div>
-      ` : ''}
-
-      <!-- Formulario Crear (Admin) - Campo de Imagen por URL -->
-      ${showForm && isAdmin ? `
-        <div class="form-container">
-          <h2>Añadir Nuevo Producto</h2>
-          <form id="add-product-form">
-            <input type="text" id="p-name" placeholder="Nombre del producto" required />
-            <input type="number" step="0.01" id="p-price" placeholder="Precio ($)" required />
-            <input type="text" id="p-sizes" placeholder="Tallas (ej: S, M, L, XL - Opcional)" />
-            <input type="text" id="p-colors" placeholder="Colores (ej: Negro, Azul, Rojo)" />
-            <select id="p-category">
-              <option value="Hombre">Hombre</option>
-              <option value="Mujer">Mujer</option>
-              <option value="Niños">Niños</option>
-              <option value="Accesorios">Accesorios</option>
-            </select>
-            <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-              <label for="p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
-              <input type="text" id="p-image" placeholder="Ej: https://..." required />
-            </div>
-            <button type="submit" class="btn-submit">Guardar Producto</button>
-          </form>
-        </div>
-      ` : ''}
-
-      <!-- Formulario Editar (Admin) - Campo de Imagen por URL -->
-      ${editingProduct && isAdmin ? `
-        <div class="form-container edit-container">
-          <h2>Editar Producto</h2>
-          <form id="edit-product-form">
-            <input type="text" id="edit-p-name" value="${editingProduct.name}" required />
-            <input type="number" step="0.01" id="edit-p-price" value="${editingProduct.price}" required />
-            <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas (ej: S, M, L, XL - Opcional)" />
-            <input type="text" id="edit-p-colors" value="${editingProduct.colors || ''}" placeholder="Colores (ej: Negro, Azul, Rojo)" />
-            <select id="edit-p-category">
-              <option value="Hombre" ${editingProduct.category === 'Hombre' ? 'selected' : ''}>Hombre</option>
-              <option value="Mujer" ${editingProduct.category === 'Mujer' ? 'selected' : ''}>Mujer</option>
-              <option value="Niños" ${editingProduct.category === 'Niños' ? 'selected' : ''}>Niños</option>
-              <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
-            </select>
-            <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-              <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
-              <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" placeholder="Ej: https://..." required />
-            </div>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-              <button type="submit" class="btn-submit" style="flex:1;">Actualizar</button>
-              <button type="button" id="btn-cancel-edit" class="delete-btn" style="flex:1;">Cancelar</button>
-            </div>
-          </form>
-        </div>
-      ` : ''}
-
-      <!-- Cuadrícula de Productos -->
-      <div class="product-grid">
-        ${productsToDisplay.length > 0 ? productsToDisplay.map(p => `
-          <div class="product-card">
-            <img src="${getImageUrl(p.image)}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
-            <h3 class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;">${p.name}</h3>
-            <p class="category">${p.category}</p> <p class="price">$${parseFloat(p.price).toFixed(2)}</p>
-            
-            <div class="card-actions">
-              ${!isAdmin ? `
-                <button class="add-cart-btn" data-id="${p.id}">Agregar al carrito</button>
-              ` : `
-                <button class="edit-btn" data-id="${p.id}">✏️ Editar</button>
-                <button class="delete-btn" data-id="${p.id}">Eliminar</button>
-              `}
             </div>
           </div>
-        `).join('') : '<p style="grid-column: 1/-1; text-align: center; color: #777;">No se encontraron productos.</p>'}
-      </div>
+
+          <!-- Acciones especiales para Administrador -->
+          ${isAdmin ? `
+            <div class="admin-subnav-actions">
+              <button id="btn-toggle-dashboard" class="btn-subnav-action">
+                ${activeTab === 'dashboard' ? '🛒 Ver Catálogo' : '📊 Reportes Admin'}
+              </button>
+              <button id="btn-toggle-form" class="btn-subnav-action btn-add">
+                ${showForm ? '✕ Cerrar' : '+ Nuevo Producto'}
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      </header>
+
+      ${activeTab === 'dashboard' && isAdmin ? renderDashboardMetrics() : `
+        <!-- Carrito Ventana Flotante -->
+        ${showCart && !isAdmin ? `
+          <div class="cart-modal">
+            <h3>Tu Carrito</h3>
+            ${cartItems.length === 0 ? '<p>El carrito está vacío.</p>' : `
+              <ul class="cart-list">
+                ${cartItems.map((item, idx) => `
+                  <li>
+                    <div>
+                      <strong>${item.name}</strong><br/>
+                      <small>Talla: ${item.selectedSize} | Color: ${item.selectedColor}</small><br/> <span>$${parseFloat(item.price).toFixed(2)}</span>
+                    </div>
+                    <button class="remove-cart-item-btn" data-index="${idx}">X</button>
+                  </li>
+                `).join('')}
+              </ul>
+              <hr />
+              <p class="cart-total"><strong>Total:</strong> $${cartTotal.toFixed(2)}</p>
+              <button id="btn-go-checkout" class="btn-checkout">Proceder al Pago</button>
+            `}
+            <button id="btn-close-cart" class="btn-submit" style="margin-top:8px; width:100%; background-color:#718096;">Cerrar</button>
+          </div>
+        ` : ''}
+
+        <!-- Formulario Crear (Admin) -->
+        ${showForm && isAdmin ? `
+          <div class="form-container">
+            <h2>Añadir Nuevo Producto</h2>
+            <form id="add-product-form">
+              <input type="text" id="p-name" placeholder="Nombre del producto" required />
+              <input type="number" step="0.01" id="p-price" placeholder="Precio ($)" required />
+              <input type="text" id="p-sizes" placeholder="Tallas (ej: S, M, L, XL - Opcional)" />
+              <input type="text" id="p-colors" placeholder="Colores (ej: Negro, Azul, Rojo)" />
+              <select id="p-category">
+                <option value="Hombre">Hombre</option>
+                <option value="Mujer">Mujer</option>
+                <option value="Niños">Niños</option>
+                <option value="Accesorios">Accesorios</option>
+              </select>
+              <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                <label for="p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
+                <input type="text" id="p-image" placeholder="Ej: https://..." required />
+              </div>
+              <button type="submit" class="btn-submit">Guardar Producto</button>
+            </form>
+          </div>
+        ` : ''}
+
+        <!-- Formulario Editar (Admin) -->
+        ${editingProduct && isAdmin ? `
+          <div class="form-container edit-container">
+            <h2>Editar Producto</h2>
+            <form id="edit-product-form">
+              <input type="text" id="edit-p-name" value="${editingProduct.name}" required />
+              <input type="number" step="0.01" id="edit-p-price" value="${editingProduct.price}" required />
+              <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas (ej: S, M, L, XL - Opcional)" />
+              <input type="text" id="edit-p-colors" value="${editingProduct.colors || ''}" placeholder="Colores (ej: Negro, Azul, Rojo)" />
+              <select id="edit-p-category">
+                <option value="Hombre" ${editingProduct.category === 'Hombre' ? 'selected' : ''}>Hombre</option>
+                <option value="Mujer" ${editingProduct.category === 'Mujer' ? 'selected' : ''}>Mujer</option>
+                <option value="Niños" ${editingProduct.category === 'Niños' ? 'selected' : ''}>Niños</option>
+                <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
+              </select>
+              <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
+                <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" placeholder="Ej: https://..." required />
+              </div>
+              <div style="display:flex; gap:10px; margin-top:10px;">
+                <button type="submit" class="btn-submit" style="flex:1;">Actualizar</button>
+                <button type="button" id="btn-cancel-edit" class="delete-btn" style="flex:1;">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        ` : ''}
+
+        <!-- Cuadrícula de Productos -->
+        <div class="product-grid" style="margin-top: 20px;">
+          ${productsToDisplay.length > 0 ? productsToDisplay.map(p => `
+            <div class="product-card">
+              <img src="${getImageUrl(p.image)}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
+              <h3 class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;">${p.name}</h3>
+              <p class="category">${p.category}</p> <p class="price">$${parseFloat(p.price).toFixed(2)}</p>
+              
+              <div class="card-actions">
+                ${!isAdmin ? `
+                  <button class="add-cart-btn" data-id="${p.id}">Agregar al carrito</button>
+                ` : `
+                  <button class="edit-btn" data-id="${p.id}">✏️ Editar</button>
+                  <button class="delete-btn" data-id="${p.id}">Eliminar</button>
+                `}
+              </div>
+            </div>
+          `).join('') : '<p style="grid-column: 1/-1; text-align: center; color: #777; padding: 40px;">No se encontraron productos.</p>'}
+        </div>
+      `}
     </div>
   `
 
-  // --- REGISTRO DE EVENTOS DE SESIÓN Y MODAL ---
+  // --- REGISTRO DE EVENTOS ---
   document.querySelector('#btn-open-auth')?.addEventListener('click', openAuthModal);
   document.querySelector('#btn-logout')?.addEventListener('click', logout);
 
-  // Evento de selección de categorías
-  document.querySelectorAll('.shein-category-card').forEach(card => {
-    card.addEventListener('click', (e) => {
+  // Evento de selección de categoría desde el menú desplegable
+  document.querySelectorAll('.dropdown-category-item').forEach(item => {
+    item.addEventListener('click', (e) => {
       const cat = (e.currentTarget as HTMLElement).getAttribute('data-category');
       if (cat) {
         currentCategory = cat;
@@ -497,7 +563,13 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   });
 
-  // Abrir Modal de Detalle
+  // Toggle para el Dashboard Admin
+  document.querySelector('#btn-toggle-dashboard')?.addEventListener('click', () => {
+    activeTab = activeTab === 'catalog' ? 'dashboard' : 'catalog';
+    showForm = false;
+    applyFiltersAndRender();
+  });
+
   document.querySelectorAll('.product-click-trigger').forEach(element => {
     element.addEventListener('click', (e) => {
       const target = e.currentTarget as HTMLElement;
@@ -507,12 +579,10 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   });
 
-  // Evento Botón Proceder al Pago
   document.querySelector('#btn-go-checkout')?.addEventListener('click', () => {
     openCheckoutModal();
   });
 
-  // Búsqueda
   const searchInput = document.querySelector<HTMLInputElement>('#search-input');
   if (searchInput) {
     searchInput.focus();
@@ -525,7 +595,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   }
 
-  // Toggles de carrito y formularios
   document.querySelector('#btn-toggle-form')?.addEventListener('click', () => {
     showForm = !showForm;
     if (showForm) { showCart = false; editingProduct = null; }
@@ -543,7 +612,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     applyFiltersAndRender();
   });
 
-  // Formulario Crear Producto
   const form = document.querySelector('#add-product-form');
   if (form) {
     form.addEventListener('submit', (e) => {
@@ -562,7 +630,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   }
 
-  // Formulario Editar Producto
   const editForm = document.querySelector('#edit-product-form');
   if (editForm && editingProduct) {
     const idToUpdate = editingProduct.id;
@@ -587,7 +654,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   }
 
-  // Eventos de botones en tarjetas
   document.querySelectorAll('.edit-btn').forEach(button => {
     button.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -637,7 +703,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   });
 }
 
-// Configuración de eventos modales estáticos en el HTML
 document.getElementById('close-detail-modal')?.addEventListener('click', closeProductDetail);
 document.getElementById('close-checkout-modal')?.addEventListener('click', closeCheckoutModal);
 
@@ -648,7 +713,6 @@ window.addEventListener('click', (e) => {
   if (e.target === checkoutModal) closeCheckoutModal();
 });
 
-// Inicializar Módulo Autenticación UI y Cargar la Aplicación
 initAuthUI(() => {
   checkUserSession();
 });
