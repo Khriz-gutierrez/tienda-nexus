@@ -154,7 +154,7 @@ body {
 .categories-dropdown-container {
   position: relative;
   display: inline-block;
-  padding-bottom: 12px; /* Puente invisible para que el cursor no pierda el hover */
+  padding-bottom: 12px;
   margin-bottom: -12px;
 }
 
@@ -177,7 +177,6 @@ body {
   background-color: #0d1259;
 }
 
-/* EFECTO HOVER: Se despliega automáticamente al pasar el cursor */
 .categories-dropdown-container:hover .categories-dropdown-content {
   display: block;
   opacity: 1;
@@ -723,10 +722,17 @@ body {
 
   .product-card {
     padding: 10px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
 
   .product-card img {
+    width: 100% !important;
     height: 160px !important;
+    object-fit: cover !important;
+    border-radius: 6px;
+    background-color: #f7fafc; /* Fondo gris claro de soporte mientras carga */
   }
 
   .product-card h3 {
