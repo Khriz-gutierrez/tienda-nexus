@@ -157,12 +157,26 @@ async function deleteProduct(id: number) {
   }
 }
 
-// Helper para construir la URL de la imagen
+// Helper optimizado para construir la URL de la imagen (Soporta Google Drive institucional y enlaces web)
 function getImageUrl(imagePath: string): string {
   if (!imagePath) return '';
+
+  // Si el enlace es de Google Drive, extraemos su ID y lo transformamos para visualización directa
+  if (imagePath.includes('drive.google.com') || imagePath.includes('googleusercontent.com')) {
+    const match = imagePath.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const fileId = match ? match[1] : null;
+
+    if (fileId) {
+      return `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
+    }
+  }
+
+  // Si ya es un enlace web normal (http/https)
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
+
+  // Si es una ruta local del backend
   return `${API_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
 }
 
@@ -457,13 +471,11 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
             ${cartItems.length === 0 ? '<p>El carrito está vacío.</p>' : `
               <ul class="cart-list">
                 ${cartItems.map((item, idx) => `
-                  <li>
-                    <div>
-                      <strong>${item.name}</strong><br/>
-                      <small>Talla: ${item.selectedSize} | Color: ${item.selectedColor}</small><br/> <span>$${parseFloat(item.price).toFixed(2)}</span>
-                    </div>
-                    <button class="remove-cart-item-btn" data-index="${idx}">X</button>
-                  </li>
+                  <div>
+                    <strong>${item.name}</strong><br/>
+                    <small>Talla: ${item.selectedSize} | Color: ${item.selectedColor}</small><br/> <span>$${parseFloat(item.price).toFixed(2)}</span>
+                  </div>
+                  <button class="remove-cart-item-btn" data-index="${idx}">X</button>
                 `).join('')}
               </ul>
               <hr />
@@ -490,8 +502,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
                 <option value="Accesorios">Accesorios</option>
               </select>
               <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-                <label for="p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
-                <input type="text" id="p-image" placeholder="Ej: https://..." required />
+                <label for="p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen (Google Drive o Web):</label>
+                <input type="text" id="p-image" placeholder="Ej: https://drive.google.com/file/d/..." required />
               </div>
               <button type="submit" class="btn-submit">Guardar Producto</button>
             </form>
@@ -514,8 +526,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
                 <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
               </select>
               <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-                <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen:</label>
-                <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" placeholder="Ej: https://..." required />
+                <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen (Google Drive o Web):</label>
+                <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" placeholder="Ej: https://drive.google.com/file/d/..." required />
               </div>
               <div style="display:flex; gap:10px; margin-top:10px;">
                 <button type="submit" class="btn-submit" style="flex:1;">Actualizar</button>
