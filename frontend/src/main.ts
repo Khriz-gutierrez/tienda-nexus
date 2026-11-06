@@ -69,7 +69,6 @@ async function loadProducts() {
   }
 }
 
-// Función auxiliar para guardar stock en localStorage de forma segura (soporta el 0)
 function saveStockToLocalStorage(id: number, stockValue: number) {
   const savedStocks = JSON.parse(localStorage.getItem('nexus_stocks') || '{}');
   savedStocks[id] = stockValue;
@@ -117,7 +116,7 @@ async function updateProduct(id: number, productData: { name: string; price: str
   try {
     saveStockToLocalStorage(id, productData.stock);
 
-    const res = await fetch(`${API_URL}/api/products/${id}`, {
+    await fetch(`${API_URL}/api/products/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -335,7 +334,6 @@ function openCheckoutModal() {
       e.preventDefault();
       const customerName = (document.getElementById('cust-name') as HTMLInputElement).value;
 
-      // Descontar el stock automáticamente al completar la compra
       cartItems.forEach(cartItem => {
         const productInStock = allProducts.find(p => p.id === cartItem.id);
         if (productInStock) {
