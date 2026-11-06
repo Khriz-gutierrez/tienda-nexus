@@ -59,7 +59,7 @@ function requireAdmin(req, res, next) {
 // ----------------------------------------------------
 async function initDB() {
   try {
-    // 1. Crear la tabla de productos si no existe
+    // 1. Crear tabla de productos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
@@ -68,11 +68,13 @@ async function initDB() {
         category VARCHAR(100),
         image TEXT,
         sizes VARCHAR(100),
-        colors VARCHAR(100)
+        colors VARCHAR(100),
+        stock INT DEFAULT 50,
+        status VARCHAR(20) DEFAULT 'Published'
       );
     `);
 
-    // 2. Crear la tabla de usuarios
+    // 2. Crear tabla de usuarios
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -84,32 +86,64 @@ async function initDB() {
       );
     `);
 
-    // 3. Asegurar columnas de tallas y colores en productos
+    // 3. Crear tabla de Pedidos / Facturas (Soporte Fiscal Nicaragua - DGI)
     await pool.query(`
-      ALTER TABLE products ADD COLUMN IF NOT EXISTS sizes VARCHAR(100);
-      ALTER TABLE products ADD COLUMN IF NOT EXISTS colors VARCHAR(100);
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE SET NULL,
+        customer_name VARCHAR(150) NOT NULL,
+        customer_email VARCHAR(150) NOT NULL,
+        shipping_address TEXT NOT NULL,
+        payment_method VARCHAR(50) NOT NULL,
+        invoice_type VARCHAR(20) DEFAULT 'interna', -- 'interna' o 'fiscal'
+        fiscal_number VARCHAR(50),
+        subtotal NUMERIC(10, 2) NOT NULL,
+        tax_iva NUMERIC(10, 2) DEFAULT 0.00, -- 15% IVA Nicaragua
+        total NUMERIC(10, 2) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
     `);
 
-    // 4. Poblar catálogo inicial solo si está vacía la tabla products
+    // 4. Detalle de items de cada pedido
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id SERIAL PRIMARY KEY,
+        order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+        product_id INT REFERENCES products(id) ON DELETE SET NULL,
+        product_name VARCHAR(255) NOT NULL,
+        quantity INT NOT NULL,
+        unit_price NUMERIC(10, 2) NOT NULL,
+        selected_size VARCHAR(50),
+        selected_color VARCHAR(50)
+      );
+    `);
+
+    // 5. Asegurar columnas en products si la tabla ya existía
+    await pool.query(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INT DEFAULT 50;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'Published';
+    `);
+
+    // 6. Poblado inicial si la tabla products está vacía
     const { rows } = await pool.query('SELECT COUNT(*) FROM products');
     if (parseInt(rows[0].count) === 0) {
       await pool.query(`
-        INSERT INTO products (name, price, category, image, sizes, colors) VALUES
-        ('Chaqueta Denim Oversize', 45.99, 'Hombre', 'https://images.unsplash.com/photo-1544441893-675973e31985?w=300', 'S, M, L, XL', 'Azul, Negro'),
-        ('Camiseta Básica Cotton', 18.50, 'Hombre', 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300', 'S, M, L', 'Blanco, Negro, Gris'),
-        ('Jeans Slim Fit', 35.00, 'Hombre', 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300', '30, 32, 34', 'Azul Oscuro'),
-        ('Blusa Casual Elegante', 28.00, 'Mujer', 'https://images.unsplash.com/photo-1551803091-e20673f15770?w=300', 'S, M, L', 'Blanco, Rosa'),
-        ('Sudadera Hooded Black', 40.00, 'Mujer', 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=300', 'XS, S, M', 'Negro'),
-        ('Conjunto Algodón Niños', 25.00, 'Niños', 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=300', '4, 6, 8, 10', 'Amarillo, Azul'),
-        ('Vestido Estampado Niña', 22.00, 'Niños', 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=300', '2, 4, 6', 'Multicolor'),
-        ('Gorra Urbana Snapback', 15.00, 'Accesorios', 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=300', 'Ajustable', 'Negro'),
-        ('Mochila Minimalista', 38.00, 'Accesorios', 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300', 'Única', 'Gris, Negro'),
-        ('Lentes de Sol Retro', 18.00, 'Accesorios', 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=300', 'Única', 'Carey, Negro');
+        INSERT INTO products (name, price, category, image, sizes, colors, stock, status) VALUES
+        ('Chaqueta Denim Oversize', 45.99, 'Hombre', 'https://images.unsplash.com/photo-1544441893-675973e31985?w=300', 'S, M, L, XL', 'Azul, Negro', 25, 'Published'),
+        ('Camiseta Básica Cotton', 18.50, 'Hombre', 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300', 'S, M, L', 'Blanco, Negro, Gris', 40, 'Published'),
+        ('Jeans Slim Fit', 35.00, 'Hombre', 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=300', '30, 32, 34', 'Azul Oscuro', 15, 'Published'),
+        ('Blusa Casual Elegante', 28.00, 'Mujer', 'https://images.unsplash.com/photo-1551803091-e20673f15770?w=300', 'S, M, L', 'Blanco, Rosa', 30, 'Published'),
+        ('Sudadera Hooded Black', 40.00, 'Mujer', 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=300', 'XS, S, M', 'Negro', 18, 'Published'),
+        ('Conjunto Algodón Niños', 25.00, 'Niños', 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=300', '4, 6, 8, 10', 'Amarillo, Azul', 20, 'Published'),
+        ('Vestido Estampado Niña', 22.00, 'Niños', 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=300', '2, 4, 6', 'Multicolor', 12, 'Published'),
+        ('Gorra Urbana Snapback', 15.00, 'Accesorios', 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=300', 'Ajustable', 'Negro', 50, 'Published'),
+        ('Mochila Minimalista', 38.00, 'Accesorios', 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300', 'Única', 'Gris, Negro', 10, 'Published'),
+        ('Lentes de Sol Retro', 18.00, 'Accesorios', 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=300', 'Única', 'Carey, Negro', 35, 'Published');
       `);
       console.log('✅ Catálogo inicial cargado.');
     }
 
-    console.log('✅ Base de datos configurada correctamente.');
+    console.log('✅ Base de datos configurada correctamente con soporte de ventas y facturación.');
   } catch (err) {
     console.error('❌ Error al inicializar DB:', err.message);
   }
@@ -198,7 +232,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 });
 
 // ----------------------------------------------------
-// RUTAS API PRODUCTOS (Reciben la URL directamente)
+// RUTAS API PRODUCTOS
 // ----------------------------------------------------
 
 app.get('/api/products', async (req, res) => {
@@ -222,13 +256,13 @@ app.get('/api/products/:id', async (req, res) => {
 // Crear producto (Protegido - Solo Admin)
 app.post('/api/products', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { name, price, category, image, sizes, colors } = req.body;
+    const { name, price, category, image, sizes, colors, stock, status } = req.body;
     
     const imageUrl = image || 'https://via.placeholder.com/300';
 
     const { rows } = await pool.query(
-      'INSERT INTO products (name, price, category, image, sizes, colors) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [name, price, category, imageUrl, sizes || 'S, M, L', colors || 'Variados']
+      'INSERT INTO products (name, price, category, image, sizes, colors, stock, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [name, price, category, imageUrl, sizes || 'S, M, L', colors || 'Variados', stock || 50, status || 'Published']
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -240,13 +274,13 @@ app.post('/api/products', requireAuth, requireAdmin, async (req, res) => {
 app.put('/api/products/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price, category, image, sizes, colors } = req.body;
+    const { name, price, category, image, sizes, colors, stock, status } = req.body;
 
     const imageUrl = image || 'https://via.placeholder.com/300';
 
     const { rows } = await pool.query(
-      'UPDATE products SET name = $1, price = $2, category = $3, image = $4, sizes = $5, colors = $6 WHERE id = $7 RETURNING *',
-      [name, price, category, imageUrl, sizes, colors, id]
+      'UPDATE products SET name = $1, price = $2, category = $3, image = $4, sizes = $5, colors = $6, stock = COALESCE($7, stock), status = COALESCE($8, status) WHERE id = $9 RETURNING *',
+      [name, price, category, imageUrl, sizes, colors, stock, status, id]
     );
 
     if (rows.length === 0) {
@@ -263,6 +297,86 @@ app.delete('/api/products/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
     res.json({ message: 'Producto eliminado' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// RUTAS DE VENTAS Y FACTURACIÓN (Nicaragua DGI / Interna)
+// ----------------------------------------------------
+
+// Registrar un Checkout / Crear Factura
+app.post('/api/orders', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { customerName, customerEmail, shippingAddress, paymentMethod, items, isFiscalInvoice } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'El carrito no contiene productos' });
+    }
+
+    await client.query('BEGIN');
+
+    // Calcular Totales e IVA (15% en Nicaragua para facturas fiscales)
+    let subtotal = 0;
+    for (const item of items) {
+      subtotal += parseFloat(item.price) * (item.quantity || 1);
+    }
+
+    const taxIva = isFiscalInvoice ? parseFloat((subtotal * 0.15).toFixed(2)) : 0.00;
+    const total = parseFloat((subtotal + taxIva).toFixed(2));
+    
+    // Generar Número Fiscal consecutivo si aplica
+    let fiscalNumber = null;
+    if (isFiscalInvoice) {
+      const orderCountResult = await client.query("SELECT COUNT(*) FROM orders WHERE invoice_type = 'fiscal'");
+      const count = parseInt(orderCountResult.rows[0].count) + 1;
+      fiscalNumber = `FAC-NI-${String(count).padStart(6, '0')}`;
+    }
+
+    const orderResult = await client.query(
+      `INSERT INTO orders (customer_name, customer_email, shipping_address, payment_method, invoice_type, fiscal_number, subtotal, tax_iva, total)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [customerName, customerEmail, shippingAddress, paymentMethod, isFiscalInvoice ? 'fiscal' : 'interna', fiscalNumber, subtotal, taxIva, total]
+    );
+
+    const newOrder = orderResult.rows[0];
+
+    // Registrar items y descontar stock
+    for (const item of items) {
+      await client.query(
+        `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, selected_size, selected_color)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [newOrder.id, item.id, item.name, item.quantity || 1, item.price, item.selectedSize || 'Única', item.selectedColor || 'Estándar']
+      );
+
+      // Descontar del inventario
+      await client.query(
+        `UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2`,
+        [item.quantity || 1, item.id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      message: 'Orden y factura procesadas con éxito',
+      order: newOrder
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Obtener reporte de facturas/ventas (Protegido - Solo Admin)
+app.get('/api/orders/report', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM orders ORDER BY created_at DESC');
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
