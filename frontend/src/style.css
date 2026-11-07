@@ -724,3 +724,111 @@ body {
     border-bottom-color: #3d312a;
   }
 }
+
+/* ==========================================
+   Menú Lateral Deslizante del Cliente (Drawer)
+   ========================================== */
+.client-drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(61, 49, 42, 0.4);
+  z-index: 4000;
+  display: flex;
+  transition: opacity 0.3s ease;
+}
+
+.client-drawer-panel {
+  width: 300px;
+  max-width: 80%;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: 4px 0 20px rgba(61, 49, 42, 0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 25px;
+  box-sizing: border-box;
+  text-align: left;
+  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  overflow-y: auto;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee8e2;
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+}
+
+.drawer-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #3d312a;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.drawer-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #3d312a;
+}
+
+.drawer-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #8c7a6b;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 15px 0 8px 0;
+}
+
+.drawer-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  color: #3d312a;
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-decoration: none;
+}
+
+.drawer-nav-item:hover {
+  background-color: #f7f4f0;
+}
+
+.drawer-divider {
+  height: 1px;
+  background-color: #eee8e2;
+  margin: 15px 0;
+}
+
+.btn-menu-trigger {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #3d312a;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}

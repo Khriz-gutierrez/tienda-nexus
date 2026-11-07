@@ -33,9 +33,13 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://tienda-nexus.onrender.c
 let currentUser: User | null = null;
 let allProducts: Product[] = [];
 let cartItems: CartItem[] = [];
+let favoritesIds: number[] = JSON.parse(localStorage.getItem('nexus_favorites') || '[]');
 let salesHistory: SaleRecord[] = JSON.parse(localStorage.getItem('nexus_sales') || '[]');
 let showForm: boolean = false;
 let showCart: boolean = false;
+let showDrawer: boolean = false;
+let showHelpModal: boolean = false;
+let showFavoritesView: boolean = false;
 let currentCategory: string = 'Todos';
 let searchQuery: string = '';
 let editingProduct: Product | null = null;
@@ -192,6 +196,16 @@ function getImageUrl(imagePath: string): string {
   }
 
   return `${API_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+}
+
+function toggleFavorite(id: number) {
+  if (favoritesIds.includes(id)) {
+    favoritesIds = favoritesIds.filter(favId => favId !== id);
+  } else {
+    favoritesIds.push(id);
+  }
+  localStorage.setItem('nexus_favorites', JSON.stringify(favoritesIds));
+  applyFiltersAndRender();
 }
 
 function openProductDetail(product: Product) {
@@ -355,7 +369,6 @@ function openCheckoutModal() {
         }
       });
 
-      // Registrar la venta para la zona de facturación y contabilidad
       const newSale: SaleRecord = {
         id: 'FAC-' + Math.floor(100000 + Math.random() * 900000),
         date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
@@ -368,14 +381,14 @@ function openCheckoutModal() {
       localStorage.setItem('nexus_sales', JSON.stringify(salesHistory));
 
       modalBody.innerHTML = `
-        <div class="checkout-success-container" id="printable-invoice">
+        <div class="checkout-success-container">
           <h2>🎉 ¡Compra Exitosa!</h2>
           <p>Factura: <strong>${newSale.id}</strong></p>
           <p>Cliente: <strong>${customerName}</strong></p>
           <p>Método de Pago: <strong>${paymentMethod}</strong></p>
           <p class="detail-price">Total Facturado: $${total.toFixed(2)} (IVA Incluido)</p>
           <div style="display:flex; gap:10px; margin-top:15px;">
-            <button id="btn-print-invoice" class="btn-submit" style="flex:1; background:#2b6cb0;"> Imprimir Factura</button>
+            <button id="btn-print-invoice" class="btn-submit" style="flex:1; background:#2b6cb0;">🖨️ Imprimir Factura</button>
             <button id="btn-finish-checkout" class="btn-submit" style="flex:1;">Aceptar</button>
           </div>
         </div>
@@ -406,7 +419,9 @@ function closeCheckoutModal() {
 function applyFiltersAndRender() {
   let filtered = allProducts;
 
-  if (currentCategory !== 'Todos') {
+  if (showFavoritesView) {
+    filtered = allProducts.filter(p => favoritesIds.includes(p.id));
+  } else if (currentCategory !== 'Todos') {
     filtered = filtered.filter(p => p.category === currentCategory);
   }
 
@@ -435,19 +450,19 @@ function renderAdminDashboard() {
       <div class="admin-sidebar">
         <div class="admin-sidebar-title">Gestión Boutique</div>
         <button class="admin-nav-item ${adminSubTab === 'inventory' ? 'active' : ''}" data-subtab="inventory">
-           Inventario
+          📦 Inventario
         </button>
         <button class="admin-nav-item ${adminSubTab === 'pos' ? 'active' : ''}" data-subtab="pos">
-           Área de Venta (POS)
+          🛍️ Área de Venta (POS)
         </button>
         <button class="admin-nav-item ${adminSubTab === 'billing' ? 'active' : ''}" data-subtab="billing">
-           Zona de Facturación
+          🧾 Zona de Facturación
         </button>
         <button class="admin-nav-item ${adminSubTab === 'metrics' ? 'active' : ''}" data-subtab="metrics">
-           Contabilidad y Métricas
+          📊 Contabilidad y Métricas
         </button>
         <button class="admin-nav-item ${adminSubTab === 'reports' ? 'active' : ''}" data-subtab="reports">
-           Reportes Fiscales / IVA
+          📋 Reportes Fiscales / IVA
         </button>
       </div>
 
@@ -455,7 +470,7 @@ function renderAdminDashboard() {
         ${adminSubTab === 'inventory' ? `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h3 style="margin:0; color:#3d312a;">Inventario General de Productos</h3>
-            <button id="btn-print-inventory" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;"> Imprimir Inventario</button>
+            <button id="btn-print-inventory" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;">🖨️ Imprimir Inventario</button>
           </div>
           <table class="report-table">
             <thead>
@@ -490,7 +505,7 @@ function renderAdminDashboard() {
                     <td>#${p.id}</td>
                     <td>
                       <div style="display:flex; align-items:center; gap:10px;">
-                        <img src="${getImageUrl(p.image)}" alt="${p.name}" style="width:35px; height:35px; object-fit:cover; border-radius:4px;" />
+                        <img src="${getImageUrl(p.image)}" alt="${p.name}" style="width:35px; height:35px; object-fit:contain; background:#fcfbfa; border-radius:4px;" />
                         <strong>${p.name}</strong>
                       </div>
                     </td>
@@ -519,7 +534,7 @@ function renderAdminDashboard() {
           <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:15px;">
             ${allProducts.map(p => `
               <div style="border:1px solid #eee8e2; padding:10px; border-radius:8px; background:#faf8f5; text-align:center;">
-                <img src="${getImageUrl(p.image)}" style="width:100%; height:100px; object-fit:cover; border-radius:6px;" />
+                <img src="${getImageUrl(p.image)}" style="width:100%; height:100px; object-fit:contain; background:#fcfbfa; border-radius:6px;" />
                 <h4 style="margin:8px 0 4px 0; font-size:0.9rem;">${p.name}</h4>
                 <p style="margin:0; font-weight:bold; color:#3d312a;">$${parseFloat(p.price).toFixed(2)}</p>
                 <button class="pos-add-btn btn-submit" data-id="${p.id}" style="margin-top:8px; width:100%; padding:6px; font-size:0.8rem;">Añadir a Venta</button>
@@ -536,7 +551,7 @@ function renderAdminDashboard() {
         ${adminSubTab === 'billing' ? `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h3 style="margin:0; color:#3d312a;">Zona de Facturación y Comprobantes</h3>
-            <button onclick="window.print()" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;"> Imprimir Historial</button>
+            <button onclick="window.print()" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;">🖨️ Imprimir Historial</button>
           </div>
           <table class="report-table">
             <thead>
@@ -584,7 +599,7 @@ function renderAdminDashboard() {
         ${adminSubTab === 'reports' ? `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h3 style="margin:0; color:#3d312a;">Reportes Fiscales y Liquidación de IVA (15%)</h3>
-            <button onclick="window.print()" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;"> Imprimir Reporte Fiscal</button>
+            <button onclick="window.print()" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;">🖨️ Imprimir Reporte Fiscal</button>
           </div>
           <table class="report-table">
             <thead>
@@ -617,9 +632,76 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
   app.innerHTML = `
     <div class="App">
+      <!-- Menú Lateral Deslizante del Cliente (Estilo Drawer) -->
+      ${showDrawer ? `
+        <div class="client-drawer-overlay" id="drawer-overlay-click">
+          <div class="client-drawer-panel">
+            <div class="drawer-header">
+              <h3>NEXUSGEAR</h3>
+              <button class="drawer-close-btn" id="btn-close-drawer">✕</button>
+            </div>
+
+            <div class="drawer-section-title">Categorías</div>
+            ${categoriesList.map(cat => `
+              <button class="drawer-nav-item drawer-cat-select ${!showFavoritesView && cat.id === selectedCategory ? 'active' : ''}" data-category="${cat.id}">
+                <span>${cat.label}</span>
+              </button>
+            `).join('')}
+
+            <div class="drawer-divider"></div>
+
+            <!-- Opciones exclusivas si ha iniciado sesión -->
+            ${currentUser ? `
+              <div class="drawer-section-title">Mi Cuenta</div>
+              <button class="drawer-nav-item" id="drawer-profile-btn">
+                👤 Mi perfil (${currentUser.name})
+              </button>
+              <button class="drawer-nav-item" id="drawer-orders-btn">
+                📦 Mis pedidos (${salesHistory.length})
+              </button>
+              <button class="drawer-nav-item ${showFavoritesView ? 'active' : ''}" id="drawer-favs-btn">
+                ❤️ Mis favoritos (${favoritesIds.length})
+              </button>
+              <div class="drawer-divider"></div>
+            ` : ''}
+
+            <div class="drawer-section-title">Soporte</div>
+            <a href="https://wa.me/50588888888" target="_blank" class="drawer-nav-item">
+              💬 Contactar con la tienda
+            </a>
+            <button class="drawer-nav-item" id="drawer-help-btn">
+              ❓ Ayuda
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Modal de Ayuda Elegante -->
+      ${showHelpModal ? `
+        <div class="client-drawer-overlay" id="help-modal-overlay">
+          <div style="background:white; padding:30px; border-radius:12px; max-width:450px; width:90%; box-shadow:0 10px 30px rgba(61,49,42,0.2); text-align:left; position:relative; box-sizing:border-box;">
+            <button id="btn-close-help" style="position:absolute; top:15px; right:15px; background:none; border:none; font-size:1.2rem; cursor:pointer;">✕</button>
+            <h3 style="margin-top:0; color:#3d312a; font-size:1.3rem;">Centro de Ayuda y Soporte</h3>
+            <p style="color:#666; font-size:0.95rem; line-height:1.5;">¿Tienes dudas con tus compras o envíos locales en NexusGear? Estamos aquí para asistirte.</p>
+            <div style="background:#f7f4f0; padding:15px; border-radius:8px; margin:15px 0;">
+              <p style="margin:0 0 8px 0; font-size:0.9rem;"><strong>📧 Correo:</strong> soporte@nexusgear.local</p>
+              <p style="margin:0; font-size:0.9rem;"><strong>📞 WhatsApp:</strong> +505 8888-8888</p>
+            </div>
+            <a href="https://wa.me/50588888888" target="_blank" class="btn-submit" style="display:block; text-align:center; text-decoration:none; background:#25d366; margin-top:15px;">
+              💬 Abrir Chat de Soporte
+            </a>
+          </div>
+        </div>
+      ` : ''}
+
       <header class="navbar-container">
         <div class="navbar-top">
-          <h1 class="brand-logo">NEXUSGEAR</h1>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button id="btn-open-drawer" class="btn-menu-trigger" title="Menú de Navegación">
+              ☰
+            </button>
+            <h1 class="brand-logo" style="cursor:pointer;" id="logo-home-click">NEXUSGEAR</h1>
+          </div>
 
           <div class="search-bar-container">
             <input 
@@ -653,22 +735,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           </div>
         </div>
 
-        <div class="navbar-subnav">
-          <div class="categories-dropdown-container">
-            <button id="btn-categories-toggle" class="categories-toggle-btn">
-              Categorías ▾
-            </button>
-            <div id="categories-dropdown-menu" class="categories-dropdown-content">
-              ${categoriesList.map(cat => `
-                <div class="dropdown-category-item ${cat.id === selectedCategory ? 'active' : ''}" data-category="${cat.id}">
-                  <img src="${cat.img}" alt="${cat.label}" class="dropdown-cat-thumb" />
-                  <span>${cat.label}</span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          ${isAdmin ? `
+        ${isAdmin ? `
+          <div class="navbar-subnav" style="justify-content: flex-end;">
             <div class="admin-subnav-actions">
               <button id="btn-toggle-dashboard" class="btn-subnav-action">
                 ${activeTab === 'dashboard' ? '🛒 Ver Catálogo' : '📊 Panel de Administración'}
@@ -677,24 +745,31 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
                 ${showForm ? '✕ Cerrar' : '+ Nuevo Producto'}
               </button>
             </div>
-          ` : ''}
-        </div>
+          </div>
+        ` : ''}
       </header>
 
       ${activeTab === 'dashboard' && isAdmin ? renderAdminDashboard() : `
         
-        <section class="hero-banner">
-          <div class="hero-banner-content">
-            <div class="hero-text">
-              <h1>Moda y Estilo al Alcance de tus Manos</h1>
-              <p>Explora lo nuevo en nuestra tienda. Encuentra las mejores prendas y accesorios seleccionados especialmente para ti, con calidad garantizada y envíos locales.</p>
-              <button class="hero-btn" id="btn-explore-collection">Ver Catálogo</button>
+        ${!showFavoritesView ? `
+          <section class="hero-banner">
+            <div class="hero-banner-content">
+              <div class="hero-text">
+                <h1>Moda y Estilo al Alcance de tus Manos</h1>
+                <p>Explora lo nuevo en nuestra tienda. Encuentra las mejores prendas y accesorios seleccionados especialmente para ti, con calidad garantizada y envíos locales.</p>
+                <button class="hero-btn" id="btn-explore-collection">Ver Catálogo</button>
+              </div>
+              <div class="hero-image">
+                <img src="https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600" alt="NexusGear Store" />
+              </div>
             </div>
-            <div class="hero-image">
-              <img src="https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600" alt="NexusGear Store" />
-            </div>
+          </section>
+        ` : `
+          <div style="max-width:1200px; margin:20px auto; padding:0 20px; text-align:left;">
+            <h2>❤️ Mis Productos Favoritos</h2>
+            <p style="color:#666;">Aquí tienes la lista de prendas que has marcado como tus favoritas.</p>
           </div>
-        </section>
+        `}
 
         ${showCart && !isAdmin ? `
           <div class="cart-modal side-cart-panel" style="position:fixed; top:0; right:0; width:380px; height:100vh; background:white; box-shadow:-4px 0 15px rgba(61,49,42,0.15); z-index:1000; padding:20px; display:flex; flex-direction:column; box-sizing:border-box;">
@@ -790,27 +865,119 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         ` : ''}
 
         <div class="product-grid" style="margin-top: 20px;">
-          ${productsToDisplay.length > 0 ? productsToDisplay.map((p, index) => `
-            <div class="product-card" style="position: relative;">
-              ${index < 3 ? `<span style="position: absolute; top: 22px; left: 22px; background: #3d312a; color: white; font-size: 0.7rem; font-weight: bold; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; z-index: 2;">New</span>` : ''}
-              <img src="${getImageUrl(p.image)}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
-              <h3 class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;">${p.name}</h3>
-              <p class="category">${p.category}</p> <p class="price">$${parseFloat(p.price).toFixed(2)}</p>
-              
-              <div class="card-actions">
+          ${productsToDisplay.length > 0 ? productsToDisplay.map((p, index) => {
+            const isFav = favoritesIds.includes(p.id);
+            return `
+              <div class="product-card" style="position: relative;">
+                ${index < 3 && !showFavoritesView ? `<span style="position: absolute; top: 22px; left: 22px; background: #3d312a; color: white; font-size: 0.7rem; font-weight: bold; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; z-index: 2;">New</span>` : ''}
+                
                 ${!isAdmin ? `
-                  <button class="add-cart-btn" data-id="${p.id}">Ver Detalles / Comprar</button>
-                ` : `
-                  <button class="edit-btn" data-id="${p.id}">✏️ Editar</button>
-                  <button class="delete-btn" data-id="${p.id}">Eliminar</button>
-                `}
+                  <button class="btn-fav-toggle" data-id="${p.id}" style="position: absolute; top: 15px; right: 15px; background: white; border: 1px solid #eee8e2; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; font-size: 1rem; z-index: 2; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
+                    ${isFav ? '❤️' : '🤍'}
+                  </button>
+                ` : ''}
+
+                <img src="${getImageUrl(p.image)}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
+                <h3 class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;">${p.name}</h3>
+                <p class="category">${p.category}</p> <p class="price">$${parseFloat(p.price).toFixed(2)}</p>
+                
+                <div class="card-actions">
+                  ${!isAdmin ? `
+                    <button class="add-cart-btn" data-id="${p.id}">Ver Detalles / Comprar</button>
+                  ` : `
+                    <button class="edit-btn" data-id="${p.id}">✏️ Editar</button>
+                    <button class="delete-btn" data-id="${p.id}">Eliminar</button>
+                  `}
+                </div>
               </div>
-            </div>
-          `).join('') : '<p style="grid-column: 1/-1; text-align: center; color: #777; padding: 40px;">No se encontraron productos.</p>'}
+            `;
+          }).join('') : `<p style="grid-column: 1/-1; text-align: center; color: #777; padding: 40px;">${showFavoritesView ? 'No tienes productos en favoritos todavía.' : 'No se encontraron productos.'}</p>`}
         </div>
       `}
     </div>
   `
+
+  // Event Listeners del Menú Lateral (Drawer)
+  document.querySelector('#btn-open-drawer')?.addEventListener('click', () => {
+    showDrawer = true;
+    applyFiltersAndRender();
+  });
+
+  document.querySelector('#btn-close-drawer')?.addEventListener('click', () => {
+    showDrawer = false;
+    applyFiltersAndRender();
+  });
+
+  document.querySelector('#drawer-overlay-click')?.addEventListener('click', (e) => {
+    if (e.target === document.querySelector('.client-drawer-overlay')) {
+      showDrawer = false;
+      applyFiltersAndRender();
+    }
+  });
+
+  document.querySelectorAll('.drawer-cat-select').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const cat = (e.currentTarget as HTMLElement).getAttribute('data-category');
+      if (cat) {
+        currentCategory = cat;
+        showFavoritesView = false;
+        showDrawer = false;
+        applyFiltersAndRender();
+      }
+    });
+  });
+
+  document.getElementById('logo-home-click')?.addEventListener('click', () => {
+    currentCategory = 'Todos';
+    searchQuery = '';
+    showFavoritesView = false;
+    activeTab = 'catalog';
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('drawer-profile-btn')?.addEventListener('click', () => {
+    alert(`Información de Perfil:\nNombre: ${currentUser?.name}\nCorreo: ${currentUser?.email}\nRol: ${currentUser?.role}`);
+    showDrawer = false;
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('drawer-orders-btn')?.addEventListener('click', () => {
+    alert(`Tienes ${salesHistory.length} pedido(s) registrado(s) en tu cuenta.`);
+    showDrawer = false;
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('drawer-favs-btn')?.addEventListener('click', () => {
+    showFavoritesView = true;
+    showDrawer = false;
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('drawer-help-btn')?.addEventListener('click', () => {
+    showHelpModal = true;
+    showDrawer = false;
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('btn-close-help')?.addEventListener('click', () => {
+    showHelpModal = false;
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('help-modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('help-modal-overlay')) {
+      showHelpModal = false;
+      applyFiltersAndRender();
+    }
+  });
+
+  document.querySelectorAll('.btn-fav-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
+      toggleFavorite(id);
+    });
+  });
 
   document.querySelector('#btn-open-auth')?.addEventListener('click', openAuthModal);
   document.querySelector('#btn-logout')?.addEventListener('click', logout);
@@ -960,13 +1127,15 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   document.querySelectorAll('.edit-btn').forEach(button => {
     button.addEventListener('click', (e) => {
       e.stopPropagation();
-      const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
-      const product = allProducts.find(p => p.id === id);
-      if (product) {
-        editingProduct = product;
-        showForm = false;
-        showCart = false;
-        applyFiltersAndRender();
+      let idAttr = (e.currentTarget as HTMLElement).getAttribute('data-id');
+      if (idAttr) {
+        const product = allProducts.find(p => p.id === Number(idAttr));
+        if (product) {
+          editingProduct = product;
+          showForm = false;
+          showCart = false;
+          applyFiltersAndRender();
+        }
       }
     });
   });
