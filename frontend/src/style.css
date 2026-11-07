@@ -636,91 +636,6 @@ body {
 }
 
 /* ==========================================
-   DISEÑO RESPONSIVO PERFECTO PARA MÓVILES
-   ========================================== */
-@media (max-width: 768px) {
-  .navbar-top {
-    flex-direction: column;
-    gap: 12px;
-    padding: 12px 15px;
-  }
-
-  .navbar-subnav {
-    flex-direction: column;
-    gap: 10px;
-    padding: 10px 15px;
-  }
-
-  .admin-subnav-actions {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .search-bar-container {
-    width: 100%;
-    margin: 0;
-  }
-
-  .search-bar-container input {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .side-cart-panel {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  .product-detail-layout {
-    flex-direction: column;
-  }
-
-  .detail-image img {
-    width: 100%;
-    height: 180px;
-  }
-
-  .product-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px !important;
-    padding: 10px !important;
-  }
-
-  .product-card {
-    padding: 10px !important;
-  }
-
-  .product-card img {
-    height: 140px !important;
-    object-fit: cover !important;
-  }
-
-  .product-card h3 {
-    font-size: 0.85rem !important;
-    margin: 6px 0 2px 0;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .price {
-    font-size: 1rem !important;
-    margin: 2px 0;
-  }
-
-  .category {
-    font-size: 0.75rem !important;
-    margin: 0;
-  }
-
-  .add-cart-btn, .edit-btn, .delete-btn {
-    padding: 6px 8px !important;
-    font-size: 0.75rem !important;
-  }
-}
-
-/* ==========================================
    Etiquetas de Estado de Inventario (Admin)
    ========================================== */
 .status-badge {
@@ -845,4 +760,126 @@ body {
   padding: 25px;
   background-color: #ffffff;
   overflow-y: auto;
+}
+
+/* ==========================================
+   DISEÑO RESPONSIVO PERFECTO PARA MÓVILES (ARREGLADO)
+   ========================================== */
+@media (max-width: 768px) {
+  .navbar-top {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 15px;
+  }
+
+  .navbar-subnav {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 15px;
+  }
+
+  .admin-subnav-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .search-bar-container {
+    width: 100%;
+    margin: 0;
+  }
+
+  .search-bar-container input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .side-cart-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .product-detail-layout {
+    flex-direction: column;
+  }
+
+  .detail-image img {
+    width: 100%;
+    height: 180px;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 10px !important;
+  }
+
+  .product-card {
+    padding: 10px !important;
+  }
+
+  .product-card img {
+    height: 140px !important;
+    object-fit: cover !important;
+  }
+
+  .product-card h3 {
+    font-size: 0.85rem !important;
+    margin: 6px 0 2px 0;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .price {
+    font-size: 1rem !important;
+    margin: 2px 0;
+  }
+
+  .category {
+    font-size: 0.75rem !important;
+    margin: 0;
+  }
+
+  .add-cart-btn, .edit-btn, .delete-btn {
+    padding: 6px 8px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* El panel de admin se vuelve apilado vertical en teléfonos para que no choque */
+  .admin-dashboard-layout {
+    flex-direction: column;
+    width: 100%;
+    margin: 10px 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px;
+    border-right: none;
+    border-bottom: 1px solid #eee8e2;
+  }
+
+  .admin-sidebar-title {
+    display: none; /* Oculta el título lateral en móvil para ahorrar espacio */
+  }
+
+  .admin-nav-item {
+    white-space: nowrap;
+    padding: 8px 14px;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    text-align: center;
+    font-size: 0.85rem;
+  }
+
+  .admin-nav-item.active {
+    border-left-color: transparent;
+    border-bottom-color: #3d312a;
+  }
 }
