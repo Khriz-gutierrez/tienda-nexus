@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  background-color: #fcfbfa; /* Fondo general tipo arena muy sutil y cálido */
+  background-color: #fcfbfa;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow-x: hidden;
 }
@@ -13,7 +13,7 @@ body {
 }
 
 /* ==========================================
-   Encabezado Principal (Navbar en 2 Filas)
+   Encabezado Principal (Navbar)
    ========================================== */
 .navbar-container {
   background-color: #ffffff;
@@ -101,17 +101,18 @@ body {
   font-size: 0.85rem;
 }
 
-/* FILA SECUNDARIA DEL NAVBAR (Subnav de lado a lado) */
+/* Franja secundaria de lado a lado (Navbar Subnav) */
 .navbar-subnav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 40px; /* Margen interior amplio para que no pegue totalmente a las orillas en PC */
+  padding: 10px 40px;
   background-color: #f7f4f0;
   border-bottom: 1px solid #eee8e2;
-  width: 100%; /* Ocupa todo el ancho de la pantalla */
+  width: 100%;
   box-sizing: border-box;
 }
+
 .admin-subnav-actions {
   display: flex;
   gap: 10px;
@@ -223,7 +224,7 @@ body {
 }
 
 /* ==========================================
-   Banner de Presentación (Hero Section) Estándar PC / Adaptable
+   Banner de Presentación (Hero Section)
    ========================================== */
 .hero-banner {
   max-width: 1200px;
@@ -343,7 +344,7 @@ body {
 }
 
 /* ==========================================
-   Cuadrícula y Tarjetas de Productos (PC por defecto)
+   Cuadrícula y Tarjetas de Productos
    ========================================== */
 .product-grid {
   display: grid;
@@ -374,12 +375,15 @@ body {
   box-shadow: 0 6px 16px rgba(61, 49, 42, 0.08);
 }
 
+/* ==========================================
+   Ajuste profesional para que las imágenes se vean completas
+   ========================================== */
 .product-card img {
   width: 100% !important;
-  height: 220px !important;
-  object-fit: cover !important;
+  height: 200px !important;
+  object-fit: contain !important; /* Muestra la imagen completa sin recortarla */
+  background-color: #fcfbfa !important; /* Fondo suave elegante para rellenar espacios */
   border-radius: 8px;
-  background-color: #f7f4f0;
 }
 
 .product-card h3 {
@@ -484,9 +488,10 @@ body {
 }
 
 .detail-image img {
-  width: 220px;
-  height: 220px;
-  object-fit: cover;
+  width: 100%;
+  height: 320px !important; /* Altura más generosa tipo boutique */
+  object-fit: contain !important; /* Evita que se recorte la prenda */
+  background-color: #fcfbfa;
   border-radius: 8px;
 }
 

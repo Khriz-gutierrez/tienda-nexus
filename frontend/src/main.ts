@@ -19,11 +19,21 @@ interface CartItem extends Product {
   quantity: number;
 }
 
+interface SaleRecord {
+  id: string;
+  date: string;
+  customer: string;
+  total: number;
+  itemsCount: number;
+  paymentMethod: string;
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://tienda-nexus.onrender.com';
 
 let currentUser: User | null = null;
 let allProducts: Product[] = [];
 let cartItems: CartItem[] = [];
+let salesHistory: SaleRecord[] = JSON.parse(localStorage.getItem('nexus_sales') || '[]');
 let showForm: boolean = false;
 let showCart: boolean = false;
 let currentCategory: string = 'Todos';
@@ -31,7 +41,7 @@ let searchQuery: string = '';
 let editingProduct: Product | null = null;
 let isAdmin: boolean = false;
 let activeTab: 'catalog' | 'dashboard' = 'catalog'; 
-let adminSubTab: 'inventory' | 'metrics' | 'reports' = 'inventory';
+let adminSubTab: 'inventory' | 'pos' | 'billing' | 'metrics' | 'reports' = 'inventory';
 
 const categoriesList = [
   { id: 'Todos', label: 'Ver todo', img: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=150' },
@@ -333,6 +343,7 @@ function openCheckoutModal() {
     checkoutForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const customerName = (document.getElementById('cust-name') as HTMLInputElement).value;
+      const paymentMethod = (document.getElementById('payment-method') as HTMLSelectElement).value;
 
       cartItems.forEach(cartItem => {
         const productInStock = allProducts.find(p => p.id === cartItem.id);
@@ -344,17 +355,38 @@ function openCheckoutModal() {
         }
       });
 
+      // Registrar la venta para la zona de facturación y contabilidad
+      const newSale: SaleRecord = {
+        id: 'FAC-' + Math.floor(100000 + Math.random() * 900000),
+        date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString(),
+        customer: customerName,
+        total: total,
+        itemsCount: cartItems.reduce((sum, i) => sum + i.quantity, 0),
+        paymentMethod: paymentMethod
+      };
+      salesHistory.unshift(newSale);
+      localStorage.setItem('nexus_sales', JSON.stringify(salesHistory));
+
       modalBody.innerHTML = `
-        <div class="checkout-success-container">
+        <div class="checkout-success-container" id="printable-invoice">
           <h2>🎉 ¡Compra Exitosa!</h2>
-          <p>Gracias por tu compra, <strong>${customerName}</strong>.</p>
-          <p>Hemos procesado tu pedido correctamente y actualizado el inventario.</p>
-          <button id="btn-finish-checkout" class="btn-submit" style="margin-top:15px;">Aceptar</button>
+          <p>Factura: <strong>${newSale.id}</strong></p>
+          <p>Cliente: <strong>${customerName}</strong></p>
+          <p>Método de Pago: <strong>${paymentMethod}</strong></p>
+          <p class="detail-price">Total Facturado: $${total.toFixed(2)} (IVA Incluido)</p>
+          <div style="display:flex; gap:10px; margin-top:15px;">
+            <button id="btn-print-invoice" class="btn-submit" style="flex:1; background:#2b6cb0;"> Imprimir Factura</button>
+            <button id="btn-finish-checkout" class="btn-submit" style="flex:1;">Aceptar</button>
+          </div>
         </div>
       `;
 
       cartItems = [];
       showCart = false;
+
+      document.getElementById('btn-print-invoice')?.addEventListener('click', () => {
+        window.print();
+      });
 
       document.getElementById('btn-finish-checkout')?.addEventListener('click', () => {
         closeCheckoutModal();
@@ -391,7 +423,8 @@ function applyFiltersAndRender() {
 
 function renderAdminDashboard() {
   const totalProducts = allProducts.length;
-  const totalValue = allProducts.reduce((sum, p) => sum + parseFloat(p.price || '0'), 0);
+  const totalValue = allProducts.reduce((sum, p) => sum + (parseFloat(p.price || '0') * (p.stock !== undefined ? p.stock : 15)), 0);
+  const totalSalesRevenue = salesHistory.reduce((sum, s) => sum + s.total, 0);
   const categoryCounts = allProducts.reduce((acc: Record<string, number>, p) => {
     acc[p.category] = (acc[p.category] || 0) + 1;
     return acc;
@@ -402,13 +435,19 @@ function renderAdminDashboard() {
       <div class="admin-sidebar">
         <div class="admin-sidebar-title">Gestión Boutique</div>
         <button class="admin-nav-item ${adminSubTab === 'inventory' ? 'active' : ''}" data-subtab="inventory">
-          📦 Inventario y Artículos
+           Inventario
+        </button>
+        <button class="admin-nav-item ${adminSubTab === 'pos' ? 'active' : ''}" data-subtab="pos">
+           Área de Venta (POS)
+        </button>
+        <button class="admin-nav-item ${adminSubTab === 'billing' ? 'active' : ''}" data-subtab="billing">
+           Zona de Facturación
         </button>
         <button class="admin-nav-item ${adminSubTab === 'metrics' ? 'active' : ''}" data-subtab="metrics">
-          📈 Métricas y Resumen
+           Contabilidad y Métricas
         </button>
         <button class="admin-nav-item ${adminSubTab === 'reports' ? 'active' : ''}" data-subtab="reports">
-          📋 Reportes Fiscales / IVA
+           Reportes Fiscales / IVA
         </button>
       </div>
 
@@ -416,7 +455,7 @@ function renderAdminDashboard() {
         ${adminSubTab === 'inventory' ? `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h3 style="margin:0; color:#3d312a;">Inventario General de Productos</h3>
-            <span style="font-size:0.85rem; color:#8c7a6b;">Total en catálogo: <strong>${totalProducts}</strong></span>
+            <button id="btn-print-inventory" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;"> Imprimir Inventario</button>
           </div>
           <table class="report-table">
             <thead>
@@ -459,9 +498,7 @@ function renderAdminDashboard() {
                     <td><strong>$${parseFloat(p.price).toFixed(2)}</strong></td>
                     <td>${stockVal} un.</td>
                     <td>
-                      <span class="status-badge ${badgeClass}">
-                        ${badgeText}
-                      </span>
+                      <span class="status-badge ${badgeClass}">${badgeText}</span>
                     </td>
                     <td>
                       <div class="table-action-btns">
@@ -476,32 +513,85 @@ function renderAdminDashboard() {
           </table>
         ` : ''}
 
+        ${adminSubTab === 'pos' ? `
+          <h3 style="margin-top:0; color:#3d312a;">Área de Venta Rápida (POS Mostrador)</h3>
+          <p style="font-size:0.9rem; color:#666;">Selecciona productos para registrar una venta inmediata en caja:</p>
+          <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:15px;">
+            ${allProducts.map(p => `
+              <div style="border:1px solid #eee8e2; padding:10px; border-radius:8px; background:#faf8f5; text-align:center;">
+                <img src="${getImageUrl(p.image)}" style="width:100%; height:100px; object-fit:cover; border-radius:6px;" />
+                <h4 style="margin:8px 0 4px 0; font-size:0.9rem;">${p.name}</h4>
+                <p style="margin:0; font-weight:bold; color:#3d312a;">$${parseFloat(p.price).toFixed(2)}</p>
+                <button class="pos-add-btn btn-submit" data-id="${p.id}" style="margin-top:8px; width:100%; padding:6px; font-size:0.8rem;">Añadir a Venta</button>
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top:20px; padding:15px; background:#f7f4f0; border-radius:8px;">
+            <h4 style="margin:0 0 10px 0;">Venta Actual en Caja (${cartItems.reduce((s, i) => s + i.quantity, 0)} items)</h4>
+            <p style="font-weight:bold; font-size:1.1rem; margin:0 0 10px 0;">Total: $${cartItems.reduce((acc, i) => acc + (parseFloat(i.price) * i.quantity), 0).toFixed(2)}</p>
+            <button id="pos-checkout-btn" class="btn-submit" style="background:#2b6cb0;" ${cartItems.length === 0 ? 'disabled style="background:#ccc;"' : ''}>Cobrar y Facturar Venta</button>
+          </div>
+        ` : ''}
+
+        ${adminSubTab === 'billing' ? `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0; color:#3d312a;">Zona de Facturación y Comprobantes</h3>
+            <button onclick="window.print()" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;"> Imprimir Historial</button>
+          </div>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th>No. Factura</th>
+                <th>Fecha y Hora</th>
+                <th>Cliente</th>
+                <th>Método de Pago</th>
+                <th>Total Facturado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${salesHistory.length === 0 ? '<tr><td colspan="5" style="text-align:center; color:#777;">No hay facturas registradas aún.</td></tr>' : 
+                salesHistory.map(s => `
+                  <tr>
+                    <td><strong>${s.id}</strong></td>
+                    <td>${s.date}</td>
+                    <td>${s.customer}</td>
+                    <td>${s.paymentMethod}</td>
+                    <td><strong>$${s.total.toFixed(2)}</strong></td>
+                  </tr>
+                `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+
         ${adminSubTab === 'metrics' ? `
-          <h3 style="margin-top:0; color:#3d312a;">Métricas y Estado General</h3>
+          <h3 style="margin-top:0; color:#3d312a;">Contabilidad y Métricas Generales</h3>
           <div class="dashboard-cards-grid">
             <div class="metric-card">
-              <h3>Total de Productos</h3>
-              <p class="metric-value">${totalProducts}</p>
+              <h3>Ingresos Totales (Ventas)</h3>
+              <p class="metric-value">$${totalSalesRevenue.toFixed(2)}</p>
             </div>
             <div class="metric-card">
-              <h3>Valor del Catálogo</h3>
+              <h3>Valor del Inventario</h3>
               <p class="metric-value">$${totalValue.toFixed(2)}</p>
             </div>
             <div class="metric-card">
-              <h3>Categorías Activas</h3>
-              <p class="metric-value">${Object.keys(categoryCounts).length}</p>
+              <h3>Total de Artículos</h3>
+              <p class="metric-value">${totalProducts}</p>
             </div>
           </div>
         ` : ''}
 
         ${adminSubTab === 'reports' ? `
-          <h3 style="margin-top:0; color:#3d312a;">Reportes de Categorías y Facturación Fiscal (IVA 15%)</h3>
-          <table class="report-table" style="margin-top:15px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0; color:#3d312a;">Reportes Fiscales y Liquidación de IVA (15%)</h3>
+            <button onclick="window.print()" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;"> Imprimir Reporte Fiscal</button>
+          </div>
+          <table class="report-table">
             <thead>
               <tr>
                 <th>Categoría</th>
                 <th>Artículos Registrados</th>
-                <th>Participación del Total</th>
+                <th>Participación del Catálogo</th>
               </tr>
             </thead>
             <tbody>
@@ -732,7 +822,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   document.querySelectorAll('.admin-nav-item').forEach(button => {
     button.addEventListener('click', (e) => {
       const subtab = (e.currentTarget as HTMLElement).getAttribute('data-subtab');
-      if (subtab === 'inventory' || subtab === 'metrics' || subtab === 'reports') {
+      if (subtab === 'inventory' || subtab === 'pos' || subtab === 'billing' || subtab === 'metrics' || subtab === 'reports') {
         adminSubTab = subtab;
         applyFiltersAndRender();
       }
@@ -795,6 +885,30 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   document.querySelector('#btn-close-cart')?.addEventListener('click', () => {
     showCart = false;
     applyFiltersAndRender();
+  });
+
+  document.querySelectorAll('.pos-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
+      const product = allProducts.find(p => p.id === id);
+      if (product) {
+        const existing = cartItems.find(i => i.id === id);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          cartItems.push({ ...product, selectedSize: 'Única', selectedColor: 'Estándar', quantity: 1 });
+        }
+        applyFiltersAndRender();
+      }
+    });
+  });
+
+  document.getElementById('pos-checkout-btn')?.addEventListener('click', () => {
+    openCheckoutModal();
+  });
+
+  document.getElementById('btn-print-inventory')?.addEventListener('click', () => {
+    window.print();
   });
 
   const form = document.querySelector('#add-product-form');
