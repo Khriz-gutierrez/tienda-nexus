@@ -231,7 +231,7 @@ function openProductDetail(product: Product) {
         <h2>${product.name}</h2>
         <p class="detail-price">$${parseFloat(product.price).toFixed(2)}</p>
         <p><strong>Categoría:</strong> ${product.category}</p>
-        <p><strong>Disponibilidad:</strong> ${stockVal > 0 ? `${stockVal} unidades disponibles` : 'Agotado'}</p>
+        <p><strong>Disponibilidad:</strong> <span style="color: ${stockVal > 0 ? '#2f855a' : '#c53030'}; font-weight: 600;">${stockVal > 0 ? 'Disponible' : 'Agotado'}</span></p>
         
         ${!isAccesorios ? `
           <div class="variant-selector" style="margin-top: 15px;">
@@ -314,7 +314,7 @@ function openProductDetail(product: Product) {
       }
 
       closeProductDetail();
-      showCart = true;
+      showCart = false;
       applyFiltersAndRender();
     });
   }
@@ -335,20 +335,21 @@ function openCheckoutModal() {
   const total = cartItems.reduce((acc, item) => acc + (parseFloat(item.price) * item.quantity), 0);
 
   modalBody.innerHTML = `
-    <h2>Finalizar Compra</h2>
+    <h2>Finalizar Compra / Cobro en Caja</h2>
     <p>Resumen del pedido: <strong>${cartItems.reduce((sum, i) => sum + i.quantity, 0)} producto(s)</strong></p>
     <p class="detail-price">Total a pagar: $${total.toFixed(2)}</p>
     
     <form id="checkout-form" style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
-      <input type="text" id="cust-name" placeholder="Nombre completo" value="${currentUser ? currentUser.name : ''}" required />
+      <input type="text" id="cust-name" placeholder="Nombre del cliente" value="${currentUser ? currentUser.name : ''}" required />
       <input type="email" id="cust-email" placeholder="Correo electrónico" value="${currentUser ? currentUser.email : ''}" required />
-      <input type="text" id="cust-address" placeholder="Dirección de envío (Local)" required />
+      <input type="text" id="cust-address" placeholder="Dirección de envío o sucursal" required />
       <select id="payment-method" required>
+        <option value="Efectivo">Efectivo en Caja</option>
         <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
         <option value="Transferencia">Transferencia Bancaria</option>
-        <option value="Efectivo">Pago Contra Entrega</option>
+        <option value="Contra Entrega">Pago Contra Entrega</option>
       </select>
-      <button type="submit" class="btn-submit" style="margin-top:10px;">Confirmar y Pagar</button>
+      <button type="submit" class="btn-submit" style="margin-top:10px;">Confirmar y Generar Factura</button>
     </form>
   `;
 
@@ -359,7 +360,6 @@ function openCheckoutModal() {
       const customerName = (document.getElementById('cust-name') as HTMLInputElement).value;
       const paymentMethod = (document.getElementById('payment-method') as HTMLSelectElement).value;
 
-      // Descuento automático de stock al confirmar el pedido
       cartItems.forEach(cartItem => {
         const productInStock = allProducts.find(p => p.id === cartItem.id);
         if (productInStock) {
@@ -383,13 +383,13 @@ function openCheckoutModal() {
 
       modalBody.innerHTML = `
         <div class="checkout-success-container">
-          <h2>🎉 ¡Compra Exitosa!</h2>
-          <p>Factura: <strong>${newSale.id}</strong></p>
+          <h2>🎉 ¡Venta Facturada con Éxito!</h2>
+          <p>Factura No: <strong>${newSale.id}</strong></p>
           <p>Cliente: <strong>${customerName}</strong></p>
           <p>Método de Pago: <strong>${paymentMethod}</strong></p>
-          <p class="detail-price">Total Facturado: $${total.toFixed(2)} (IVA Incluido)</p>
+          <p class="detail-price">Total Cobrado: $${total.toFixed(2)}</p>
           <div style="display:flex; gap:10px; margin-top:15px;">
-            <button id="btn-print-invoice" class="btn-submit" style="flex:1; background:#2b6cb0;">🖨️ Imprimir Factura</button>
+            <button id="btn-print-invoice" class="btn-submit" style="flex:1; background:#7a6b61;">🖨️ Imprimir Factura</button>
             <button id="btn-finish-checkout" class="btn-submit" style="flex:1;">Aceptar</button>
           </div>
         </div>
@@ -451,24 +451,19 @@ function renderAdminDashboard() {
       <div class="admin-sidebar">
         <div class="admin-sidebar-title">Gestión Boutique</div>
         <button class="admin-nav-item ${adminSubTab === 'inventory' ? 'active' : ''}" data-subtab="inventory">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-          Inventario
+          📦 Inventario
         </button>
         <button class="admin-nav-item ${adminSubTab === 'pos' ? 'active' : ''}" data-subtab="pos">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-          Área de Venta (POS)
+          🛍️ Área de Venta (POS)
         </button>
         <button class="admin-nav-item ${adminSubTab === 'billing' ? 'active' : ''}" data-subtab="billing">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          Zona de Facturación
+          🧾 Zona de Facturación
         </button>
         <button class="admin-nav-item ${adminSubTab === 'metrics' ? 'active' : ''}" data-subtab="metrics">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          Contabilidad y Métricas
+          📊 Contabilidad y Métricas
         </button>
         <button class="admin-nav-item ${adminSubTab === 'reports' ? 'active' : ''}" data-subtab="reports">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-          Reportes Fiscales
+          📋 Reportes Fiscales / IVA
         </button>
       </div>
 
@@ -536,7 +531,7 @@ function renderAdminDashboard() {
 
         ${adminSubTab === 'pos' ? `
           <h3 style="margin-top:0; color:#3d312a;">Área de Venta Rápida (POS Mostrador)</h3>
-          <p style="font-size:0.9rem; color:#666;">Caja registradora virtual: selecciona los artículos que el cliente lleva en tienda física para emitir su factura y descontar stock automáticamente.</p>
+          <p style="font-size:0.9rem; color:#666;">Selecciona productos para registrar una venta inmediata en caja:</p>
           <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:15px;">
             ${allProducts.map(p => `
               <div style="border:1px solid #eee8e2; padding:10px; border-radius:8px; background:#faf8f5; text-align:center;">
@@ -547,10 +542,28 @@ function renderAdminDashboard() {
               </div>
             `).join('')}
           </div>
-          <div style="margin-top:20px; padding:15px; background:#f7f4f0; border-radius:8px;">
-            <h4 style="margin:0 0 10px 0;">Venta Actual en Caja (${cartItems.reduce((s, i) => s + i.quantity, 0)} items)</h4>
-            <p style="font-weight:bold; font-size:1.1rem; margin:0 0 10px 0;">Total: $${cartItems.reduce((acc, i) => acc + (parseFloat(i.price) * i.quantity), 0).toFixed(2)}</p>
-            <button id="pos-checkout-btn" class="btn-submit" style="background:#2b6cb0;" ${cartItems.length === 0 ? 'disabled style="background:#ccc;"' : ''}>Cobrar y Facturar Venta</button>
+          
+          <div style="margin-top:25px; padding:15px; background:#f7f4f0; border-radius:8px; border:1px solid #eee8e2;">
+            <h4 style="margin:0 0 10px 0; color:#3d312a;">Venta Actual en Caja (${cartItems.reduce((s, i) => s + i.quantity, 0)} items)</h4>
+            
+            ${cartItems.length === 0 ? '<p style="color:#777; font-size:0.9rem; margin:5px 0;">No hay productos agregados a la venta actual.</p>' : `
+              <ul style="list-style:none; padding:0; margin:0 0 15px 0; display:flex; flex-direction:column; gap:8px;">
+                ${cartItems.map((item, idx) => `
+                  <li style="display:flex; justify-content:space-between; align-items:center; background:white; padding:8px 12px; border-radius:6px; border:1px solid #eee8e2;">
+                    <div>
+                      <strong>${item.name}</strong> <span style="color:#666; font-size:0.85rem;">(Cant: ${item.quantity})</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <strong style="color:#3d312a;">$${(parseFloat(item.price) * item.quantity).toFixed(2)}</strong>
+                      <button class="pos-remove-item-btn" data-index="${idx}" style="background:none; border:none; cursor:pointer; font-size:1rem;" title="Quitar producto">🗑️</button>
+                    </div>
+                  </li>
+                `).join('')}
+              </ul>
+            `}
+
+            <p style="font-weight:bold; font-size:1.1rem; margin:10px 0;">Total a Cobrar: $${cartItems.reduce((acc, i) => acc + (parseFloat(i.price) * i.quantity), 0).toFixed(2)}</p>
+            <button id="pos-checkout-btn" class="btn-submit" style="background:#2b6cb0; width:100%;" ${cartItems.length === 0 ? 'disabled style="background:#ccc; cursor:not-allowed;"' : ''}>Cobrar y Facturar Venta</button>
           </div>
         ` : ''}
 
@@ -587,32 +600,17 @@ function renderAdminDashboard() {
         ${adminSubTab === 'metrics' ? `
           <h3 style="margin-top:0; color:#3d312a;">Contabilidad y Métricas Generales</h3>
           <div class="dashboard-cards-grid">
-            <div class="metric-card">
-              <h3>Ingresos Totales (Ventas)</h3>
-              <p class="metric-value">$${totalSalesRevenue.toFixed(2)}</p>
+            <div class="metric-card" style="background:#faf8f5; border:1px solid #eee8e2; padding:20px; border-radius:10px;">
+              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Ingresos Totales (Ventas)</h3>
+              <p class="metric-value" style="margin:0; font-size:1.8rem; font-weight:800; color:#3d312a;">$${totalSalesRevenue.toFixed(2)}</p>
             </div>
-            <div class="metric-card">
-              <h3>Valor del Inventario</h3>
-              <p class="metric-value">$${totalValue.toFixed(2)}</p>
+            <div class="metric-card" style="background:#faf8f5; border:1px solid #eee8e2; padding:20px; border-radius:10px;">
+              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Valor del Inventario</h3>
+              <p class="metric-value" style="margin:0; font-size:1.8rem; font-weight:800; color:#3d312a;">$${totalValue.toFixed(2)}</p>
             </div>
-            <div class="metric-card">
-              <h3>Total de Artículos</h3>
-              <p class="metric-value">${totalProducts}</p>
-            </div>
-          </div>
-          
-          <!-- Gráfico visual profesional de rendimiento -->
-          <div class="chart-bar-container">
-            <h4 style="margin:0 0 10px 0; color:#3d312a; font-size:0.95rem;">📊 Rendimiento de Ventas vs Meta Mensual</h4>
-            <div class="chart-row">
-              <span>Ingresos</span>
-              <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: ${Math.min(100, (totalSalesRevenue / 500) * 100)}%;"></div></div>
-              <span><strong>$${totalSalesRevenue.toFixed(2)}</strong></span>
-            </div>
-            <div class="chart-row">
-              <span>Inventario Activo</span>
-              <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: ${Math.min(100, (totalProducts / 20) * 100)}%; background:#b85d33;"></div></div>
-              <span><strong>${totalProducts} arts.</strong></span>
+            <div class="metric-card" style="background:#faf8f5; border:1px solid #eee8e2; padding:20px; border-radius:10px;">
+              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Total de Artículos</h3>
+              <p class="metric-value" style="margin:0; font-size:1.8rem; font-weight:800; color:#3d312a;">${totalProducts}</p>
             </div>
           </div>
         ` : ''}
@@ -640,16 +638,6 @@ function renderAdminDashboard() {
               `).join('')}
             </tbody>
           </table>
-
-          <!-- Gráfico fiscal visual -->
-          <div class="chart-bar-container" style="margin-top:20px;">
-            <h4 style="margin:0 0 10px 0; color:#3d312a; font-size:0.95rem;">📈 Distribución de IVA Recaudable Estimado</h4>
-            <p style="font-size:0.85rem; color:#666; margin:0;">Cálculo automático basado en el volumen total de ventas registradas en caja.</p>
-            <div style="margin-top:15px; background:#fff; padding:12px; border-radius:6px; border:1px solid #eee8e2; display:flex; justify-content:space-between; align-items:center;">
-              <span>IVA Estimado (15% s/ Ingresos):</span>
-              <strong style="font-size:1.1rem; color:#3d312a;">$${(totalSalesRevenue * 0.15).toFixed(2)}</strong>
-            </div>
-          </div>
         ` : ''}
       </div>
     </div>
@@ -663,7 +651,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
   app.innerHTML = `
     <div class="App">
-      <!-- Menú Lateral Deslizante del Cliente -->
+      <!-- Menú Lateral Deslizante del Cliente (Drawer) -->
       ${showDrawer ? `
         <div class="client-drawer-overlay" id="drawer-overlay-click">
           <div class="client-drawer-panel">
@@ -758,7 +746,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
             
             ${!isAdmin ? `
               <div id="btn-toggle-cart" class="cart-icon-container" style="cursor:pointer;">
-                <svg width="24" height="24" fill="none" stroke="#3d312a" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                <span class="cart-icon">🛒</span>
                 <span class="cart-badge">${totalCartCount}</span>
               </div>
             ` : ''}
@@ -1097,6 +1085,15 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         }
         applyFiltersAndRender();
       }
+    });
+  });
+
+  // Event listener para eliminar productos desde el POS
+  document.querySelectorAll('.pos-remove-item-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = Number((e.currentTarget as HTMLElement).getAttribute('data-index'));
+      cartItems.splice(index, 1);
+      applyFiltersAndRender();
     });
   });
 
