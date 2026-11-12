@@ -359,6 +359,7 @@ function openCheckoutModal() {
       const customerName = (document.getElementById('cust-name') as HTMLInputElement).value;
       const paymentMethod = (document.getElementById('payment-method') as HTMLSelectElement).value;
 
+      // Descuento automático de stock al confirmar el pedido
       cartItems.forEach(cartItem => {
         const productInStock = allProducts.find(p => p.id === cartItem.id);
         if (productInStock) {
@@ -450,19 +451,24 @@ function renderAdminDashboard() {
       <div class="admin-sidebar">
         <div class="admin-sidebar-title">Gestión Boutique</div>
         <button class="admin-nav-item ${adminSubTab === 'inventory' ? 'active' : ''}" data-subtab="inventory">
-          📦 Inventario
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          Inventario
         </button>
         <button class="admin-nav-item ${adminSubTab === 'pos' ? 'active' : ''}" data-subtab="pos">
-          🛍️ Área de Venta (POS)
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          Área de Venta (POS)
         </button>
         <button class="admin-nav-item ${adminSubTab === 'billing' ? 'active' : ''}" data-subtab="billing">
-          🧾 Zona de Facturación
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          Zona de Facturación
         </button>
         <button class="admin-nav-item ${adminSubTab === 'metrics' ? 'active' : ''}" data-subtab="metrics">
-          📊 Contabilidad y Métricas
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          Contabilidad y Métricas
         </button>
         <button class="admin-nav-item ${adminSubTab === 'reports' ? 'active' : ''}" data-subtab="reports">
-          📋 Reportes Fiscales / IVA
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          Reportes Fiscales
         </button>
       </div>
 
@@ -530,7 +536,7 @@ function renderAdminDashboard() {
 
         ${adminSubTab === 'pos' ? `
           <h3 style="margin-top:0; color:#3d312a;">Área de Venta Rápida (POS Mostrador)</h3>
-          <p style="font-size:0.9rem; color:#666;">Selecciona productos para registrar una venta inmediata en caja:</p>
+          <p style="font-size:0.9rem; color:#666;">Caja registradora virtual: selecciona los artículos que el cliente lleva en tienda física para emitir su factura y descontar stock automáticamente.</p>
           <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:15px;">
             ${allProducts.map(p => `
               <div style="border:1px solid #eee8e2; padding:10px; border-radius:8px; background:#faf8f5; text-align:center;">
@@ -594,6 +600,21 @@ function renderAdminDashboard() {
               <p class="metric-value">${totalProducts}</p>
             </div>
           </div>
+          
+          <!-- Gráfico visual profesional de rendimiento -->
+          <div class="chart-bar-container">
+            <h4 style="margin:0 0 10px 0; color:#3d312a; font-size:0.95rem;">📊 Rendimiento de Ventas vs Meta Mensual</h4>
+            <div class="chart-row">
+              <span>Ingresos</span>
+              <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: ${Math.min(100, (totalSalesRevenue / 500) * 100)}%;"></div></div>
+              <span><strong>$${totalSalesRevenue.toFixed(2)}</strong></span>
+            </div>
+            <div class="chart-row">
+              <span>Inventario Activo</span>
+              <div class="chart-bar-bg"><div class="chart-bar-fill" style="width: ${Math.min(100, (totalProducts / 20) * 100)}%; background:#b85d33;"></div></div>
+              <span><strong>${totalProducts} arts.</strong></span>
+            </div>
+          </div>
         ` : ''}
 
         ${adminSubTab === 'reports' ? `
@@ -619,6 +640,16 @@ function renderAdminDashboard() {
               `).join('')}
             </tbody>
           </table>
+
+          <!-- Gráfico fiscal visual -->
+          <div class="chart-bar-container" style="margin-top:20px;">
+            <h4 style="margin:0 0 10px 0; color:#3d312a; font-size:0.95rem;">📈 Distribución de IVA Recaudable Estimado</h4>
+            <p style="font-size:0.85rem; color:#666; margin:0;">Cálculo automático basado en el volumen total de ventas registradas en caja.</p>
+            <div style="margin-top:15px; background:#fff; padding:12px; border-radius:6px; border:1px solid #eee8e2; display:flex; justify-content:space-between; align-items:center;">
+              <span>IVA Estimado (15% s/ Ingresos):</span>
+              <strong style="font-size:1.1rem; color:#3d312a;">$${(totalSalesRevenue * 0.15).toFixed(2)}</strong>
+            </div>
+          </div>
         ` : ''}
       </div>
     </div>
@@ -632,7 +663,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
   app.innerHTML = `
     <div class="App">
-      <!-- Menú Lateral Deslizante del Cliente (Estilo Drawer) -->
+      <!-- Menú Lateral Deslizante del Cliente -->
       ${showDrawer ? `
         <div class="client-drawer-overlay" id="drawer-overlay-click">
           <div class="client-drawer-panel">
@@ -650,7 +681,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
             <div class="drawer-divider"></div>
 
-            <!-- Opciones exclusivas si ha iniciado sesión -->
             ${currentUser ? `
               <div class="drawer-section-title">Mi Cuenta</div>
               <button class="drawer-nav-item" id="drawer-profile-btn">
@@ -728,7 +758,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
             
             ${!isAdmin ? `
               <div id="btn-toggle-cart" class="cart-icon-container" style="cursor:pointer;">
-                <span class="cart-icon">🛒</span>
+                <svg width="24" height="24" fill="none" stroke="#3d312a" stroke-width="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
                 <span class="cart-badge">${totalCartCount}</span>
               </div>
             ` : ''}
@@ -772,9 +802,9 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         `}
 
         ${showCart && !isAdmin ? `
-          <div class="cart-modal side-cart-panel" style="position:fixed; top:0; right:0; width:380px; height:100vh; background:white; box-shadow:-4px 0 15px rgba(61,49,42,0.15); z-index:1000; padding:20px; display:flex; flex-direction:column; box-sizing:border-box;">
+          <div class="cart-modal side-cart-panel">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee8e2; padding-bottom:10px;">
-              <h3>Tu Bolsa de Compras</h3>
+              <h3 style="margin:0; font-size:1.1rem; color:#3d312a;">Tu Bolsa de Compras</h3>
               <button id="btn-close-cart" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">✕</button>
             </div>
             
@@ -897,7 +927,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     </div>
   `
 
-  // Event Listeners del Menú Lateral (Drawer)
+  // Event Listeners
   document.querySelector('#btn-open-drawer')?.addEventListener('click', () => {
     showDrawer = true;
     applyFiltersAndRender();

@@ -344,7 +344,7 @@ body {
 }
 
 /* ==========================================
-   Cuadrícula y Tarjetas de Productos
+   Cuadrícula y Tarjetas de Productos (Su código original)
    ========================================== */
 .product-grid {
   display: grid;
@@ -375,14 +375,10 @@ body {
   box-shadow: 0 6px 16px rgba(61, 49, 42, 0.08);
 }
 
-/* ==========================================
-   Ajuste profesional para que las imágenes se vean completas
-   ========================================== */
 .product-card img {
-  width: 100% !important;
-  height: 200px !important;
-  object-fit: contain !important; /* Muestra la imagen completa sin recortarla */
-  background-color: #fcfbfa !important; /* Fondo suave elegante para rellenar espacios */
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
   border-radius: 8px;
 }
 
@@ -489,14 +485,16 @@ body {
 
 .detail-image img {
   width: 100%;
-  height: 320px !important; /* Altura más generosa tipo boutique */
-  object-fit: contain !important; /* Evita que se recorte la prenda */
+  height: 320px !important;
+  object-fit: contain !important;
   background-color: #fcfbfa;
   border-radius: 8px;
 }
 
+/* Carrito adaptado para el teléfono (única corrección para que no se vea gigante) */
 .side-cart-panel {
   width: 380px !important;
+  max-width: 100% !important;
 }
 
 /* ==========================================
@@ -594,7 +592,7 @@ body {
 }
 
 /* ==========================================
-   MEDIA QUERY EXCLUSIVA PARA MÓVILES (Pantallas menores a 768px)
+   MEDIA QUERY EXCLUSIVA PARA MÓVILES (Su código original)
    ========================================== */
 @media (max-width: 768px) {
   .navbar-top {
