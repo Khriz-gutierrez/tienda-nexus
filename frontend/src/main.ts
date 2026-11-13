@@ -29,12 +29,15 @@ interface SaleRecord {
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://tienda-nexus.onrender.com';
+const EXCHANGE_RATE = 36.62;
 
 let currentUser: User | null = null;
 let allProducts: Product[] = [];
 let cartItems: CartItem[] = [];
 let favoritesIds: number[] = JSON.parse(localStorage.getItem('nexus_favorites') || '[]');
 let salesHistory: SaleRecord[] = JSON.parse(localStorage.getItem('nexus_sales') || '[]');
+let currentCurrency: 'USD' | 'NIO' = 'USD';
+
 let showForm: boolean = false;
 let showCart: boolean = false;
 let showDrawer: boolean = false;
@@ -43,6 +46,7 @@ let showFavoritesView: boolean = false;
 let currentCategory: string = 'Todos';
 let searchQuery: string = '';
 let editingProduct: Product | null = null;
+let pendingDeleteId: number | null = null;
 let isAdmin: boolean = false;
 let activeTab: 'catalog' | 'dashboard' = 'catalog'; 
 let adminSubTab: 'inventory' | 'pos' | 'billing' | 'metrics' | 'reports' = 'inventory';
@@ -52,8 +56,21 @@ const categoriesList = [
   { id: 'Hombre', label: 'Hombre', img: 'https://images.unsplash.com/photo-1617137968427-85924c800a22?w=150' },
   { id: 'Mujer', label: 'Mujer', img: 'https://images.unsplash.com/photo-1525845859779-54d477ff291f?w=150' },
   { id: 'Niños', label: 'Niños', img: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=150' },
+  { id: 'Zapatos', label: 'Zapatos', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150' },
   { id: 'Accesorios', label: 'Accesorios', img: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=150' }
 ];
+
+function formatPrice(usdString: string | number): string {
+  const num = typeof usdString === 'string' ? parseFloat(usdString) : usdString;
+  if (isNaN(num)) return '$0.00';
+
+  if (currentCurrency === 'NIO') {
+    const nioVal = num * EXCHANGE_RATE;
+    return `C$ ${nioVal.toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } else {
+    return `$${num.toFixed(2)}`;
+  }
+}
 
 async function checkUserSession() {
   currentUser = await getCurrentUser();
@@ -156,8 +173,6 @@ async function deleteProduct(id: number) {
     return;
   }
 
-  if (!confirm('¿Estás seguro de que deseas eliminar este producto?')) return;
-
   try {
     const res = await fetch(`${API_URL}/api/products/${id}`, {
       method: 'DELETE',
@@ -215,11 +230,11 @@ function openProductDetail(product: Product) {
   if (!modal || !modalBody) return;
 
   const isAccesorios = product.category === 'Accesorios';
-  const sizesArray = product.sizes ? product.sizes.split(',').map(s => s.trim()) : ['S', 'M', 'L'];
+  const sizesArray = product.sizes ? product.sizes.split(',').map(s => s.trim()) : ['38', '39', '40', '41', '42'];
   const colorsArray = product.colors ? product.colors.split(',').map(c => c.trim()) : ['Estándar'];
   const stockVal = product.stock !== undefined ? product.stock : 15;
 
-  const whatsappMessage = encodeURIComponent(`Hola, estoy interesado en el producto: *${product.name}* (Precio: $${product.price}). ¿Está disponible?`);
+  const whatsappMessage = encodeURIComponent(`Hola, estoy interesado en el producto: *${product.name}* (Precio: ${formatPrice(product.price)}). ¿Está disponible?`);
   const whatsappUrl = `https://wa.me/50588888888?text=${whatsappMessage}`;
 
   modalBody.innerHTML = `
@@ -229,14 +244,14 @@ function openProductDetail(product: Product) {
       </div>
       <div class="detail-info">
         <h2>${product.name}</h2>
-        <p class="detail-price">$${parseFloat(product.price).toFixed(2)}</p>
+        <p class="detail-price">${formatPrice(product.price)}</p>
         <p><strong>Categoría:</strong> ${product.category}</p>
         <p><strong>Disponibilidad:</strong> <span style="color: ${stockVal > 0 ? '#2f855a' : '#c53030'}; font-weight: 600;">${stockVal > 0 ? 'Disponible' : 'Agotado'}</span></p>
         
         ${!isAccesorios ? `
           <div class="variant-selector" style="margin-top: 15px;">
-            <label style="font-size: 0.85rem; font-weight: bold; color: #4a5568; display: block; margin-bottom: 6px;">Seleccionar Talla:</label>
-            <div id="size-options-container" style="display: flex; gap: 8px;">
+            <label style="font-size: 0.85rem; font-weight: bold; color: #4a5568; display: block; margin-bottom: 6px;">Seleccionar Talla / Medida:</label>
+            <div id="size-options-container" style="display: flex; gap: 8px; flex-wrap: wrap;">
               ${sizesArray.map((size, idx) => `
                 <button type="button" class="size-pill-btn ${idx === 0 ? 'active' : ''}" data-size="${size}" style="padding: 6px 14px; border: 1px solid ${idx === 0 ? '#3d312a' : '#d4c5b9'}; background: ${idx === 0 ? '#3d312a' : 'white'}; color: ${idx === 0 ? 'white' : '#3d312a'}; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
                   ${size}
@@ -337,7 +352,7 @@ function openCheckoutModal() {
   modalBody.innerHTML = `
     <h2>Finalizar Compra / Cobro en Caja</h2>
     <p>Resumen del pedido: <strong>${cartItems.reduce((sum, i) => sum + i.quantity, 0)} producto(s)</strong></p>
-    <p class="detail-price">Total a pagar: $${total.toFixed(2)}</p>
+    <p class="detail-price">Total a pagar: ${formatPrice(total)}</p>
     
     <form id="checkout-form" style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
       <input type="text" id="cust-name" placeholder="Nombre del cliente" value="${currentUser ? currentUser.name : ''}" required />
@@ -387,7 +402,7 @@ function openCheckoutModal() {
           <p>Factura No: <strong>${newSale.id}</strong></p>
           <p>Cliente: <strong>${customerName}</strong></p>
           <p>Método de Pago: <strong>${paymentMethod}</strong></p>
-          <p class="detail-price">Total Cobrado: $${total.toFixed(2)}</p>
+          <p class="detail-price">Total Cobrado: ${formatPrice(total)}</p>
           <div style="display:flex; gap:10px; margin-top:15px;">
             <button id="btn-print-invoice" class="btn-submit" style="flex:1; background:#7a6b61;">🖨️ Imprimir Factura</button>
             <button id="btn-finish-checkout" class="btn-submit" style="flex:1;">Aceptar</button>
@@ -445,6 +460,10 @@ function renderAdminDashboard() {
     acc[p.category] = (acc[p.category] || 0) + 1;
     return acc;
   }, {});
+
+  const maxMetricVal = Math.max(totalSalesRevenue, totalValue, 1);
+  const salesPercent = Math.min(100, (totalSalesRevenue / maxMetricVal) * 100);
+  const inventoryPercent = Math.min(100, (totalValue / maxMetricVal) * 100);
 
   return `
     <div class="admin-dashboard-layout">
@@ -511,7 +530,7 @@ function renderAdminDashboard() {
                       </div>
                     </td>
                     <td>${p.category}</td>
-                    <td><strong>$${parseFloat(p.price).toFixed(2)}</strong></td>
+                    <td><strong>${formatPrice(p.price)}</strong></td>
                     <td>${stockVal} un.</td>
                     <td>
                       <span class="status-badge ${badgeClass}">${badgeText}</span>
@@ -537,7 +556,7 @@ function renderAdminDashboard() {
               <div style="border:1px solid #eee8e2; padding:10px; border-radius:8px; background:#faf8f5; text-align:center;">
                 <img src="${getImageUrl(p.image)}" style="width:100%; height:100px; object-fit:contain; background:#fcfbfa; border-radius:6px;" />
                 <h4 style="margin:8px 0 4px 0; font-size:0.9rem;">${p.name}</h4>
-                <p style="margin:0; font-weight:bold; color:#3d312a;">$${parseFloat(p.price).toFixed(2)}</p>
+                <p style="margin:0; font-weight:bold; color:#3d312a;">${formatPrice(p.price)}</p>
                 <button class="pos-add-btn btn-submit" data-id="${p.id}" style="margin-top:8px; width:100%; padding:6px; font-size:0.8rem;">Añadir a Venta</button>
               </div>
             `).join('')}
@@ -554,7 +573,7 @@ function renderAdminDashboard() {
                       <strong>${item.name}</strong> <span style="color:#666; font-size:0.85rem;">(Cant: ${item.quantity})</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
-                      <strong style="color:#3d312a;">$${(parseFloat(item.price) * item.quantity).toFixed(2)}</strong>
+                      <strong style="color:#3d312a;">${formatPrice(parseFloat(item.price) * item.quantity)}</strong>
                       <button class="pos-remove-item-btn" data-index="${idx}" style="background:none; border:none; cursor:pointer; font-size:1rem;" title="Quitar producto">🗑️</button>
                     </div>
                   </li>
@@ -562,7 +581,7 @@ function renderAdminDashboard() {
               </ul>
             `}
 
-            <p style="font-weight:bold; font-size:1.1rem; margin:10px 0;">Total a Cobrar: $${cartItems.reduce((acc, i) => acc + (parseFloat(i.price) * i.quantity), 0).toFixed(2)}</p>
+            <p style="font-weight:bold; font-size:1.1rem; margin:10px 0;">Total a Cobrar: ${formatPrice(cartItems.reduce((acc, i) => acc + (parseFloat(i.price) * i.quantity), 0))}</p>
             <button id="pos-checkout-btn" class="btn-submit" style="background:#2b6cb0; width:100%;" ${cartItems.length === 0 ? 'disabled style="background:#ccc; cursor:not-allowed;"' : ''}>Cobrar y Facturar Venta</button>
           </div>
         ` : ''}
@@ -590,7 +609,7 @@ function renderAdminDashboard() {
                     <td>${s.date}</td>
                     <td>${s.customer}</td>
                     <td>${s.paymentMethod}</td>
-                    <td><strong>$${s.total.toFixed(2)}</strong></td>
+                    <td><strong>${formatPrice(s.total)}</strong></td>
                   </tr>
                 `).join('')}
             </tbody>
@@ -599,27 +618,52 @@ function renderAdminDashboard() {
 
         ${adminSubTab === 'metrics' ? `
           <h3 style="margin-top:0; color:#3d312a;">Contabilidad y Métricas Generales</h3>
-          <div class="dashboard-cards-grid">
+          <div class="dashboard-cards-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
             <div class="metric-card" style="background:#faf8f5; border:1px solid #eee8e2; padding:20px; border-radius:10px;">
-              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Ingresos Totales (Ventas)</h3>
-              <p class="metric-value" style="margin:0; font-size:1.8rem; font-weight:800; color:#3d312a;">$${totalSalesRevenue.toFixed(2)}</p>
+              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Ingresos Totales</h3>
+              <p class="metric-value" style="margin:0; font-size:1.6rem; font-weight:800; color:#3d312a;">${formatPrice(totalSalesRevenue)}</p>
             </div>
             <div class="metric-card" style="background:#faf8f5; border:1px solid #eee8e2; padding:20px; border-radius:10px;">
-              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Valor del Inventario</h3>
-              <p class="metric-value" style="margin:0; font-size:1.8rem; font-weight:800; color:#3d312a;">$${totalValue.toFixed(2)}</p>
+              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Valor Inventario</h3>
+              <p class="metric-value" style="margin:0; font-size:1.6rem; font-weight:800; color:#3d312a;">${formatPrice(totalValue)}</p>
             </div>
             <div class="metric-card" style="background:#faf8f5; border:1px solid #eee8e2; padding:20px; border-radius:10px;">
-              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Total de Artículos</h3>
-              <p class="metric-value" style="margin:0; font-size:1.8rem; font-weight:800; color:#3d312a;">${totalProducts}</p>
+              <h3 style="margin:0 0 8px 0; font-size:0.85rem; color:#8c7a6b; text-transform:uppercase;">Artículos en Stock</h3>
+              <p class="metric-value" style="margin:0; font-size:1.6rem; font-weight:800; color:#3d312a;">${totalProducts}</p>
+            </div>
+          </div>
+
+          <div class="admin-chart-container">
+            <h4 class="admin-chart-title">📈 Gráfico Comparativo: Ingresos vs Inventario</h4>
+            
+            <div class="chart-bar-row">
+              <div class="chart-bar-info">
+                <span>Ingresos por Ventas</span>
+                <span>${formatPrice(totalSalesRevenue)}</span>
+              </div>
+              <div class="chart-bar-track">
+                <div class="chart-bar-fill" style="width: ${salesPercent}%;"></div>
+              </div>
+            </div>
+
+            <div class="chart-bar-row">
+              <div class="chart-bar-info">
+                <span>Valor del Inventario en Bodega</span>
+                <span>${formatPrice(totalValue)}</span>
+              </div>
+              <div class="chart-bar-track">
+                <div class="chart-bar-fill" style="width: ${inventoryPercent}%; background-color: #b85d33;"></div>
+              </div>
             </div>
           </div>
         ` : ''}
 
         ${adminSubTab === 'reports' ? `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3 style="margin:0; color:#3d312a;">Reportes Fiscales y Liquidación de IVA (15%)</h3>
+            <h3 style="margin:0; color:#3d312a;">Reportes Fiscales y Participación por Categoría</h3>
             <button onclick="window.print()" class="btn-submit" style="padding:6px 12px; font-size:0.8rem; background:#7a6b61;">🖨️ Imprimir Reporte Fiscal</button>
           </div>
+          
           <table class="report-table">
             <thead>
               <tr>
@@ -638,6 +682,24 @@ function renderAdminDashboard() {
               `).join('')}
             </tbody>
           </table>
+
+          <div class="admin-chart-container">
+            <h4 class="admin-chart-title">📊 Distribución del Catálogo por Categorías</h4>
+            ${Object.entries(categoryCounts).map(([cat, count]) => {
+              const pct = totalProducts > 0 ? (count / totalProducts) * 100 : 0;
+              return `
+                <div class="chart-bar-row">
+                  <div class="chart-bar-info">
+                    <span>${cat} (${count} productos)</span>
+                    <span>${pct.toFixed(1)}%</span>
+                  </div>
+                  <div class="chart-bar-track">
+                    <div class="chart-bar-fill" style="width: ${pct}%;"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
         ` : ''}
       </div>
     </div>
@@ -651,6 +713,18 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
   app.innerHTML = `
     <div class="App">
+      <!-- Modal de Confirmación de Eliminación Estilizado -->
+      <div id="confirm-modal" class="${pendingDeleteId === null ? 'hidden' : ''}">
+        <div>
+          <h3 style="margin-top:0; color:#3d312a; font-size:1.2rem;">⚠️ Confirmar Eliminación</h3>
+          <p style="color:#5c4d44; font-size:0.95rem; line-height:1.5;">¿Estás seguro de que deseas eliminar este producto del inventario? Esta acción no se puede deshacer.</p>
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button id="btn-cancel-delete" class="btn-submit" style="flex:1; background:#7a6b61;">Cancelar</button>
+            <button id="btn-confirm-delete" class="btn-submit" style="flex:1; background:#c53030;">Eliminar</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Menú Lateral Deslizante del Cliente (Drawer) -->
       ${showDrawer ? `
         <div class="client-drawer-overlay" id="drawer-overlay-click">
@@ -731,6 +805,10 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           </div>
           
           <div class="navbar-actions">
+            <button id="btn-toggle-currency" class="currency-toggle-btn" title="Cambiar Moneda">
+              ${currentCurrency === 'USD' ? ' $ USD (Cambiar a C$)' : ' C$ NIO (Cambiar a $)'}
+            </button>
+
             ${currentUser ? `
               <span class="user-badge-name">
                 👤 ${currentUser.name}${isAdmin ? ' (Admin)' : ''}
@@ -790,6 +868,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         `}
 
         ${showCart && !isAdmin ? `
+          <div class="cart-overlay-backdrop" id="cart-backdrop-click"></div>
           <div class="cart-modal side-cart-panel">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee8e2; padding-bottom:10px;">
               <h3 style="margin:0; font-size:1.1rem; color:#3d312a;">Tu Bolsa de Compras</h3>
@@ -804,7 +883,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
                       <div>
                         <strong>${item.name}</strong><br/>
                         <small style="color:#666;">Talla: ${item.selectedSize} | Color: ${item.selectedColor}</small><br/>
-                        <span style="color:#3d312a; font-weight:600;">$${parseFloat(item.price).toFixed(2)}</span>
+                        <span style="color:#3d312a; font-weight:600;">${formatPrice(item.price)}</span>
                       </div>
                       <div style="display:flex; align-items:center; gap:8px;">
                         <button class="decrease-qty-btn" data-index="${idx}" style="padding:2px 6px; background:#f7f4f0; border:none; border-radius:4px; cursor:pointer;">-</button>
@@ -821,7 +900,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
             ${cartItems.length > 0 ? `
               <div style="border-top:1px solid #eee8e2; padding-top:15px; margin-top:auto;">
                 <p class="cart-total" style="display:flex; justify-content:space-between; font-size:1.1rem; margin-bottom:15px;">
-                  <span>Subtotal / Total:</span> <strong>$${cartTotal.toFixed(2)}</strong>
+                  <span>Subtotal / Total:</span> <strong>${formatPrice(cartTotal)}</strong>
                 </p>
                 <button id="btn-go-checkout" class="btn-checkout" style="width:100%; padding:12px; background:#3d312a; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">
                   Proceder al Pago Seguro
@@ -836,14 +915,15 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
             <h2>Añadir Nuevo Producto</h2>
             <form id="add-product-form">
               <input type="text" id="p-name" placeholder="Nombre del producto" required />
-              <input type="number" step="0.01" id="p-price" placeholder="Precio ($)" required />
+              <input type="number" step="0.01" id="p-price" placeholder="Precio ($ USD)" required />
               <input type="number" id="p-stock" placeholder="Cantidad en Stock (Ej: 15)" value="15" required />
-              <input type="text" id="p-sizes" placeholder="Tallas (ej: S, M, L, XL - Opcional)" />
-              <input type="text" id="p-colors" placeholder="Colores (ej: Negro, Azul, Rojo)" />
+              <input type="text" id="p-sizes" placeholder="Tallas/Medidas (ej: 39, 40, 41 o S, M, L)" />
+              <input type="text" id="p-colors" placeholder="Colores (ej: Negro, Blanco, Café)" />
               <select id="p-category">
                 <option value="Hombre">Hombre</option>
                 <option value="Mujer">Mujer</option>
                 <option value="Niños">Niños</option>
+                <option value="Zapatos">Zapatos</option>
                 <option value="Accesorios">Accesorios</option>
               </select>
               <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
@@ -862,12 +942,13 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
               <input type="text" id="edit-p-name" value="${editingProduct.name}" required />
               <input type="number" step="0.01" id="edit-p-price" value="${editingProduct.price}" required />
               <input type="number" id="edit-p-stock" value="${editingProduct.stock !== undefined ? editingProduct.stock : 15}" placeholder="Cantidad en Stock" required />
-              <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas (ej: S, M, L, XL)" />
-              <input type="text" id="edit-p-colors" value="${editingProduct.colors || ''}" placeholder="Colores (ej: Negro, Azul)" />
+              <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas / Medidas" />
+              <input type="text" id="edit-p-colors" value="${editingProduct.colors || ''}" placeholder="Colores" />
               <select id="edit-p-category">
                 <option value="Hombre" ${editingProduct.category === 'Hombre' ? 'selected' : ''}>Hombre</option>
                 <option value="Mujer" ${editingProduct.category === 'Mujer' ? 'selected' : ''}>Mujer</option>
                 <option value="Niños" ${editingProduct.category === 'Niños' ? 'selected' : ''}>Niños</option>
+                <option value="Zapatos" ${editingProduct.category === 'Zapatos' ? 'selected' : ''}>Zapatos</option>
                 <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
               </select>
               <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
@@ -897,7 +978,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
                 <img src="${getImageUrl(p.image)}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
                 <h3 class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;">${p.name}</h3>
-                <p class="category">${p.category}</p> <p class="price">$${parseFloat(p.price).toFixed(2)}</p>
+                <p class="category">${p.category}</p> <p class="price">${formatPrice(p.price)}</p>
                 
                 <div class="card-actions">
                   ${!isAdmin ? `
@@ -916,6 +997,24 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   `
 
   // Event Listeners
+  document.getElementById('btn-cancel-delete')?.addEventListener('click', () => {
+    pendingDeleteId = null;
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('btn-confirm-delete')?.addEventListener('click', () => {
+    if (pendingDeleteId !== null) {
+      const idToDelete = pendingDeleteId;
+      pendingDeleteId = null;
+      deleteProduct(idToDelete);
+    }
+  });
+
+  document.querySelector('#btn-toggle-currency')?.addEventListener('click', () => {
+    currentCurrency = currentCurrency === 'USD' ? 'NIO' : 'USD';
+    applyFiltersAndRender();
+  });
+
   document.querySelector('#btn-open-drawer')?.addEventListener('click', () => {
     showDrawer = true;
     applyFiltersAndRender();
@@ -1014,16 +1113,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   });
 
-  document.querySelectorAll('.dropdown-category-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      const cat = (e.currentTarget as HTMLElement).getAttribute('data-category');
-      if (cat) {
-        currentCategory = cat;
-        applyFiltersAndRender();
-      }
-    });
-  });
-
   document.querySelector('#btn-toggle-dashboard')?.addEventListener('click', () => {
     activeTab = activeTab === 'catalog' ? 'dashboard' : 'catalog';
     showForm = false;
@@ -1072,6 +1161,11 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     applyFiltersAndRender();
   });
 
+  document.getElementById('cart-backdrop-click')?.addEventListener('click', () => {
+    showCart = false;
+    applyFiltersAndRender();
+  });
+
   document.querySelectorAll('.pos-add-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = Number((e.currentTarget as HTMLElement).getAttribute('data-id'));
@@ -1088,7 +1182,6 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     });
   });
 
-  // Event listener para eliminar productos desde el POS
   document.querySelectorAll('.pos-remove-item-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const index = Number((e.currentTarget as HTMLElement).getAttribute('data-index'));
@@ -1219,7 +1312,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
       e.stopPropagation();
       const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
       if (id && (e.currentTarget as HTMLElement).id !== 'btn-cancel-edit') {
-        deleteProduct(Number(id));
+        pendingDeleteId = Number(id);
+        applyFiltersAndRender();
       }
     });
   });
