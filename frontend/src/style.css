@@ -214,7 +214,7 @@ body {
 }
 
 /* ==========================================
-   Gráficos Administrativos Modernos
+   Gráficos Administrativos
    ========================================== */
 .admin-chart-container {
   background: #faf8f5;
@@ -329,34 +329,139 @@ body {
 }
 
 /* ==========================================
-   Formularios y Modales
+   Modales Flotantes Centrados y Amplios
    ========================================== */
-.form-container {
-  max-width: 450px;
-  margin: 0 auto 25px auto;
-  background: #ffffff;
-  padding: 24px;
-  border-radius: 10px;
-  border: 1px solid #eee8e2;
-  box-shadow: 0 4px 15px rgba(61, 49, 42, 0.04);
-  text-align: left;
+.modal-backdrop-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(61, 49, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3500;
   box-sizing: border-box;
+  padding: 20px;
 }
 
-.form-container h2 {
+.modal-content-box {
+  background: #ffffff;
+  padding: 30px;
+  border-radius: 14px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 15px 40px rgba(61, 49, 42, 0.25);
+  text-align: left;
+  position: relative;
+  box-sizing: border-box;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Modal de Detalles Estilo Amazon (Centrado) */
+#product-detail-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(61, 49, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3500;
+  box-sizing: border-box;
+  padding: 20px;
+}
+
+.modal-detail-large {
+  background: #ffffff;
+  padding: 30px;
+  border-radius: 14px;
+  max-width: 850px;
+  width: 95%;
+  box-shadow: 0 15px 40px rgba(61, 49, 42, 0.25);
+  text-align: left;
+  position: relative;
+  box-sizing: border-box;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.product-detail-layout-amazon {
+  display: flex;
+  gap: 30px;
+  flex-direction: row;
+}
+
+.amazon-gallery {
+  display: flex;
+  gap: 15px;
+  width: 50%;
+}
+
+.amazon-thumbnails {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.thumb-img {
+  width: 55px;
+  height: 65px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 2px solid #eee8e2;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.thumb-img.active, .thumb-img:hover {
+  border-color: #3d312a;
+}
+
+.amazon-main-image {
+  flex: 1;
+}
+
+.amazon-main-image img {
+  width: 100%;
+  height: 380px;
+  object-fit: contain;
+  background-color: #fcfbfa;
+  border-radius: 8px;
+  border: 1px solid #eee8e2;
+}
+
+.amazon-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-container h2, .modal-content-box h2 {
   margin-top: 0;
   color: #3d312a;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
 }
 
-.form-container form {
+.form-container form, .modal-content-box form {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .form-container input, 
-.form-container select {
+.form-container select,
+.form-container textarea,
+.modal-content-box input,
+.modal-content-box select,
+.modal-content-box textarea {
   padding: 10px;
   border-radius: 6px;
   border: 1px solid #d4c5b9;
@@ -364,13 +469,14 @@ body {
   outline: none;
   width: 100%;
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 .btn-submit {
   background-color: #3d312a;
   color: white;
   border: none;
-  padding: 10px;
+  padding: 11px;
   border-radius: 6px;
   font-weight: bold;
   cursor: pointer;
@@ -431,6 +537,19 @@ body {
   text-transform: uppercase;
 }
 
+.product-stars {
+  font-size: 0.85rem;
+  color: #b85d33;
+  margin: 2px 0;
+}
+
+.product-short-desc {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 6px 0;
+  line-height: 1.3;
+}
+
 .card-actions {
   display: flex;
   flex-direction: column;
@@ -477,13 +596,13 @@ body {
 }
 
 /* ==========================================
-   Modales y Diálogo de Confirmación Personalizado
+   Modales Generales
    ========================================== */
 .hidden {
   display: none !important;
 }
 
-#product-detail-modal, #checkout-modal, #confirm-modal {
+#checkout-modal, #confirm-modal {
   position: fixed;
   top: 0;
   left: 0;
@@ -498,7 +617,7 @@ body {
   padding: 20px;
 }
 
-#product-detail-modal > div, #checkout-modal > div, #confirm-modal > div {
+#checkout-modal > div, #confirm-modal > div {
   background: #ffffff;
   padding: 25px;
   border-radius: 12px;
@@ -508,20 +627,6 @@ body {
   text-align: left;
   position: relative;
   box-sizing: border-box;
-}
-
-.product-detail-layout {
-  display: flex;
-  gap: 20px;
-  flex-direction: row;
-}
-
-.detail-image img {
-  width: 100%;
-  height: 320px !important;
-  object-fit: contain !important;
-  background-color: #fcfbfa;
-  border-radius: 8px;
 }
 
 /* ==========================================
@@ -709,13 +814,30 @@ body {
     font-size: 0.75rem !important;
   }
 
-  .product-detail-layout {
-    flex-direction: column;
+  .modal-detail-large {
+    width: 100%;
+    max-height: 95vh;
+    padding: 15px;
   }
 
-  .detail-image img {
+  .product-detail-layout-amazon {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .amazon-gallery {
     width: 100%;
-    height: 180px;
+    flex-direction: column-reverse;
+  }
+
+  .amazon-thumbnails {
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+  }
+
+  .amazon-main-image img {
+    height: 220px;
   }
 
   .admin-dashboard-layout {

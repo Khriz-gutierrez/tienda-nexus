@@ -11,6 +11,8 @@ interface Product {
   sizes?: string;
   colors?: string;
   stock?: number;
+  rating?: number;
+  description?: string;
 }
 
 interface CartItem extends Product {
@@ -72,6 +74,11 @@ function formatPrice(usdString: string | number): string {
   }
 }
 
+function renderStars(rating: number = 5): string {
+  const validRating = Math.max(1, Math.min(5, rating));
+  return '★'.repeat(validRating) + '☆'.repeat(5 - validRating);
+}
+
 async function checkUserSession() {
   currentUser = await getCurrentUser();
   isAdmin = currentUser?.role === 'admin';
@@ -88,10 +95,14 @@ async function loadProducts() {
     const data = await res.json();
     
     const savedStocks = JSON.parse(localStorage.getItem('nexus_stocks') || '{}');
+    const savedRatings = JSON.parse(localStorage.getItem('nexus_ratings') || '{}');
+    const savedDescs = JSON.parse(localStorage.getItem('nexus_descriptions') || '{}');
 
     allProducts = data.map((p: any) => ({
       ...p,
-      stock: savedStocks[p.id] !== undefined ? savedStocks[p.id] : (p.stock !== undefined ? p.stock : 15)
+      stock: savedStocks[p.id] !== undefined ? savedStocks[p.id] : (p.stock !== undefined ? p.stock : 15),
+      rating: savedRatings[p.id] !== undefined ? savedRatings[p.id] : (p.rating !== undefined ? p.rating : 5),
+      description: savedDescs[p.id] !== undefined ? savedDescs[p.id] : (p.description !== undefined ? p.description : 'Diseño exclusivo, alta calidad y comodidad garantizada.')
     }));
     applyFiltersAndRender();
   } catch (err) {
@@ -106,7 +117,19 @@ function saveStockToLocalStorage(id: number, stockValue: number) {
   localStorage.setItem('nexus_stocks', JSON.stringify(savedStocks));
 }
 
-async function createProduct(productData: { name: string; price: string; sizes: string; colors: string; category: string; image: string; stock: number }) {
+function saveRatingToLocalStorage(id: number, ratingValue: number) {
+  const savedRatings = JSON.parse(localStorage.getItem('nexus_ratings') || '{}');
+  savedRatings[id] = ratingValue;
+  localStorage.setItem('nexus_ratings', JSON.stringify(savedRatings));
+}
+
+function saveDescriptionToLocalStorage(id: number, descValue: string) {
+  const savedDescs = JSON.parse(localStorage.getItem('nexus_descriptions') || '{}');
+  savedDescs[id] = descValue;
+  localStorage.setItem('nexus_descriptions', JSON.stringify(savedDescs));
+}
+
+async function createProduct(productData: { name: string; price: string; sizes: string; colors: string; category: string; image: string; stock: number; rating: number; description: string }) {
   const token = getToken();
   if (!token) {
     alert('Debes iniciar sesión como Administrador.');
@@ -136,7 +159,7 @@ async function createProduct(productData: { name: string; price: string; sizes: 
   }
 }
 
-async function updateProduct(id: number, productData: { name: string; price: string; sizes: string; colors: string; category: string; image: string; stock: number }) {
+async function updateProduct(id: number, productData: { name: string; price: string; sizes: string; colors: string; category: string; image: string; stock: number; rating: number; description: string }) {
   const token = getToken();
   if (!token) {
     alert('Debes iniciar sesión como Administrador.');
@@ -146,6 +169,8 @@ async function updateProduct(id: number, productData: { name: string; price: str
 
   try {
     saveStockToLocalStorage(id, productData.stock);
+    saveRatingToLocalStorage(id, productData.rating);
+    saveDescriptionToLocalStorage(id, productData.description);
 
     await fetch(`${API_URL}/api/products/${id}`, {
       method: 'PUT',
@@ -160,6 +185,8 @@ async function updateProduct(id: number, productData: { name: string; price: str
     await loadProducts();
   } catch (err) {
     saveStockToLocalStorage(id, productData.stock);
+    saveRatingToLocalStorage(id, productData.rating);
+    saveDescriptionToLocalStorage(id, productData.description);
     editingProduct = null;
     await loadProducts();
   }
@@ -196,20 +223,16 @@ async function deleteProduct(id: number) {
 
 function getImageUrl(imagePath: string): string {
   if (!imagePath) return '';
-
   if (imagePath.includes('drive.google.com') || imagePath.includes('googleusercontent.com')) {
     const match = imagePath.match(/\/d\/([a-zA-Z0-9_-]+)/);
     const fileId = match ? match[1] : null;
-
     if (fileId) {
       return `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
     }
   }
-
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
-
   return `${API_URL}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
 }
 
@@ -230,57 +253,99 @@ function openProductDetail(product: Product) {
   if (!modal || !modalBody) return;
 
   const isAccesorios = product.category === 'Accesorios';
-  const sizesArray = product.sizes ? product.sizes.split(',').map(s => s.trim()) : ['38', '39', '40', '41', '42'];
+  const sizesArray = product.sizes ? product.sizes.split(',').map(s => s.trim()) : ['S', 'M', 'L', 'XL'];
   const colorsArray = product.colors ? product.colors.split(',').map(c => c.trim()) : ['Estándar'];
   const stockVal = product.stock !== undefined ? product.stock : 15;
+  const productRating = product.rating !== undefined ? product.rating : 5;
+  const productDesc = product.description || 'Diseño exclusivo, alta calidad y comodidad garantizada.';
+
+  const rawImages = product.image ? product.image.split(',').map(img => getImageUrl(img.trim())) : [''];
 
   const whatsappMessage = encodeURIComponent(`Hola, estoy interesado en el producto: *${product.name}* (Precio: ${formatPrice(product.price)}). ¿Está disponible?`);
   const whatsappUrl = `https://wa.me/50588888888?text=${whatsappMessage}`;
 
   modalBody.innerHTML = `
-    <div class="product-detail-layout">
-      <div class="detail-image">
-        <img src="${getImageUrl(product.image)}" alt="${product.name}">
+    <div class="modal-detail-large">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #eee8e2; padding-bottom:10px;">
+        <h2 style="margin:0; font-size:1.2rem; color:#3d312a;">Detalles del Producto</h2>
+        <button id="btn-close-detail-modal" style="background:none; border:none; font-size:1.4rem; cursor:pointer;">✕</button>
       </div>
-      <div class="detail-info">
-        <h2>${product.name}</h2>
-        <p class="detail-price">${formatPrice(product.price)}</p>
-        <p><strong>Categoría:</strong> ${product.category}</p>
-        <p><strong>Disponibilidad:</strong> <span style="color: ${stockVal > 0 ? '#2f855a' : '#c53030'}; font-weight: 600;">${stockVal > 0 ? 'Disponible' : 'Agotado'}</span></p>
-        
-        ${!isAccesorios ? `
-          <div class="variant-selector" style="margin-top: 15px;">
-            <label style="font-size: 0.85rem; font-weight: bold; color: #4a5568; display: block; margin-bottom: 6px;">Seleccionar Talla / Medida:</label>
-            <div id="size-options-container" style="display: flex; gap: 8px; flex-wrap: wrap;">
-              ${sizesArray.map((size, idx) => `
-                <button type="button" class="size-pill-btn ${idx === 0 ? 'active' : ''}" data-size="${size}" style="padding: 6px 14px; border: 1px solid ${idx === 0 ? '#3d312a' : '#d4c5b9'}; background: ${idx === 0 ? '#3d312a' : 'white'}; color: ${idx === 0 ? 'white' : '#3d312a'}; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                  ${size}
-                </button>
+
+      <div class="product-detail-layout-amazon">
+        <div class="amazon-gallery">
+          ${rawImages.length > 1 ? `
+            <div class="amazon-thumbnails">
+              ${rawImages.map((imgUrl, idx) => `
+                <img src="${imgUrl}" alt="Thumb ${idx}" class="thumb-img ${idx === 0 ? 'active' : ''}" data-index="${idx}" />
               `).join('')}
             </div>
-            <input type="hidden" id="selected-size-value" value="${sizesArray[0]}" />
+          ` : ''}
+          <div class="amazon-main-image">
+            <img id="main-display-img" src="${rawImages[0]}" alt="${product.name}">
           </div>
-        ` : ''}
-
-        <div class="variant-selector" style="margin-top: 15px;">
-          <label for="select-color" style="font-size: 0.85rem; font-weight: bold; color: #4a5568; display: block; margin-bottom: 6px;">Seleccionar Color:</label>
-          <select id="select-color" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #d4c5b9;">
-            ${colorsArray.map(color => `<option value="${color}">${color}</option>`).join('')}
-          </select>
         </div>
-        
-        ${!isAdmin ? `
-          <button id="btn-add-modal-cart" class="btn-submit" style="margin-top: 20px; width: 100%; ${stockVal === 0 ? 'background:#ccc; cursor:not-allowed;' : ''}" ${stockVal === 0 ? 'disabled' : ''}>
-            ${stockVal === 0 ? 'Producto Agotado' : '🛒 Agregar al Carrito'}
-          </button>
+
+        <div class="amazon-info">
+          <h2 style="margin:0; font-size:1.4rem; color:#3d312a;">${product.name}</h2>
+          <div style="color: #b85d33; font-size: 1.1rem;">${renderStars(productRating)}</div>
+          <p class="detail-price" style="font-size:1.5rem; font-weight:800; color:#3d312a; margin:4px 0;">${formatPrice(product.price)}</p>
+          <p style="margin:0; color:#555; font-size:0.95rem;"><strong>Categoría:</strong> ${product.category}</p>
+          <p style="margin:0; color:#555; font-size:0.95rem;"><strong>Disponibilidad:</strong> <span style="color: ${stockVal > 0 ? '#2f855a' : '#c53030'}; font-weight: 600;">${stockVal > 0 ? 'Disponible' : 'Agotado'}</span></p>
           
-          <a href="${whatsappUrl}" target="_blank" class="btn-whatsapp" style="display:block; background:#25d366; color:white; text-align:center; padding:10px; border-radius:6px; margin-top:10px; text-decoration:none; font-weight:bold;">
-            💬 Consultar por WhatsApp
-          </a>
-        ` : ''}
+          <div style="background:#faf8f5; padding:10px; border-radius:6px; border:1px solid #eee8e2; margin-top:5px;">
+            <p style="margin:0; font-size:0.9rem; color:#444; line-height:1.4;">${productDesc}</p>
+          </div>
+
+          ${!isAccesorios ? `
+            <div class="variant-selector" style="margin-top: 10px;">
+              <label style="font-size: 0.85rem; font-weight: bold; color: #4a5568; display: block; margin-bottom: 6px;">Seleccionar Talla / Medida:</label>
+              <div id="size-options-container" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                ${sizesArray.map((size, idx) => `
+                  <button type="button" class="size-pill-btn ${idx === 0 ? 'active' : ''}" data-size="${size}" style="padding: 6px 14px; border: 1px solid ${idx === 0 ? '#3d312a' : '#d4c5b9'}; background: ${idx === 0 ? '#3d312a' : 'white'}; color: ${idx === 0 ? 'white' : '#3d312a'}; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                    ${size}
+                  </button>
+                `).join('')}
+              </div>
+              <input type="hidden" id="selected-size-value" value="${sizesArray[0]}" />
+            </div>
+          ` : ''}
+
+          <div class="variant-selector" style="margin-top: 10px;">
+            <label for="select-color" style="font-size: 0.85rem; font-weight: bold; color: #4a5568; display: block; margin-bottom: 6px;">Seleccionar Color:</label>
+            <select id="select-color" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #d4c5b9;">
+              ${colorsArray.map(color => `<option value="${color}">${color}</option>`).join('')}
+            </select>
+          </div>
+          
+          ${!isAdmin ? `
+            <button id="btn-add-modal-cart" class="btn-submit" style="margin-top: 10px; width: 100%; ${stockVal === 0 ? 'background:#ccc; cursor:not-allowed;' : ''}" ${stockVal === 0 ? 'disabled' : ''}>
+              ${stockVal === 0 ? 'Producto Agotado' : '🛒 Agregar al Carrito'}
+            </button>
+            
+            <a href="${whatsappUrl}" target="_blank" class="btn-whatsapp" style="display:block; background:#25d366; color:white; text-align:center; padding:10px; border-radius:6px; margin-top:6px; text-decoration:none; font-weight:bold;">
+              💬 Consultar por WhatsApp
+            </a>
+          ` : ''}
+        </div>
       </div>
     </div>
   `;
+
+  const thumbImages = modalBody.querySelectorAll('.thumb-img');
+  const mainDisplayImg = modalBody.querySelector('#main-display-img') as HTMLImageElement;
+  thumbImages.forEach(thumb => {
+    thumb.addEventListener('click', (e) => {
+      thumbImages.forEach(t => t.classList.remove('active'));
+      const tTarget = e.currentTarget as HTMLElement;
+      tTarget.classList.add('active');
+      const idx = Number(tTarget.getAttribute('data-index'));
+      if (mainDisplayImg && rawImages[idx]) {
+        mainDisplayImg.src = rawImages[idx];
+      }
+    });
+  });
+
+  document.getElementById('btn-close-detail-modal')?.addEventListener('click', closeProductDetail);
 
   const sizeButtons = modalBody.querySelectorAll('.size-pill-btn');
   const sizeInput = modalBody.querySelector('#selected-size-value') as HTMLInputElement;
@@ -525,7 +590,7 @@ function renderAdminDashboard() {
                     <td>#${p.id}</td>
                     <td>
                       <div style="display:flex; align-items:center; gap:10px;">
-                        <img src="${getImageUrl(p.image)}" alt="${p.name}" style="width:35px; height:35px; object-fit:contain; background:#fcfbfa; border-radius:4px;" />
+                        <img src="${getImageUrl(p.image ? p.image.split(',')[0].trim() : '')}" alt="${p.name}" style="width:35px; height:35px; object-fit:contain; background:#fcfbfa; border-radius:4px;" />
                         <strong>${p.name}</strong>
                       </div>
                     </td>
@@ -554,7 +619,7 @@ function renderAdminDashboard() {
           <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap:12px; margin-top:15px;">
             ${allProducts.map(p => `
               <div style="border:1px solid #eee8e2; padding:10px; border-radius:8px; background:#faf8f5; text-align:center;">
-                <img src="${getImageUrl(p.image)}" style="width:100%; height:100px; object-fit:contain; background:#fcfbfa; border-radius:6px;" />
+                <img src="${getImageUrl(p.image ? p.image.split(',')[0].trim() : '')}" style="width:100%; height:100px; object-fit:contain; background:#fcfbfa; border-radius:6px;" />
                 <h4 style="margin:8px 0 4px 0; font-size:0.9rem;">${p.name}</h4>
                 <p style="margin:0; font-weight:bold; color:#3d312a;">${formatPrice(p.price)}</p>
                 <button class="pos-add-btn btn-submit" data-id="${p.id}" style="margin-top:8px; width:100%; padding:6px; font-size:0.8rem;">Añadir a Venta</button>
@@ -713,7 +778,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
 
   app.innerHTML = `
     <div class="App">
-      <!-- Modal de Confirmación de Eliminación Estilizado -->
+      <!-- Modal de Confirmación de Eliminación -->
       <div id="confirm-modal" class="${pendingDeleteId === null ? 'hidden' : ''}">
         <div>
           <h3 style="margin-top:0; color:#3d312a; font-size:1.2rem;">⚠️ Confirmar Eliminación</h3>
@@ -724,6 +789,51 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           </div>
         </div>
       </div>
+
+      <!-- Modal Flotante para Añadir Nuevo Producto -->
+      ${showForm && isAdmin ? `
+        <div class="modal-backdrop-overlay" id="add-product-modal-backdrop">
+          <div class="modal-content-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+              <h2>Añadir Nuevo Producto</h2>
+              <button id="btn-close-form-modal" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <form id="add-product-form">
+              <input type="text" id="p-name" placeholder="Nombre del producto" required />
+              <input type="number" step="0.01" id="p-price" placeholder="Precio ($ USD)" required />
+              <input type="number" id="p-stock" placeholder="Cantidad en Stock (Ej: 15)" value="15" required />
+              <input type="text" id="p-sizes" placeholder="Tallas/Medidas (Ej: 30,32 o 38,39 o S,M,L)" required />
+              <input type="text" id="p-colors" placeholder="Colores (ej: Negro, Blanco, Café)" />
+              <select id="p-category">
+                <option value="Hombre">Hombre</option>
+                <option value="Mujer">Mujer</option>
+                <option value="Niños">Niños</option>
+                <option value="Zapatos">Zapatos</option>
+                <option value="Accesorios">Accesorios</option>
+              </select>
+              <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                <label for="p-rating" style="font-size:0.85rem; font-weight:600;">Calificación (Estrellas de 1 a 5):</label>
+                <select id="p-rating">
+                  <option value="5">⭐⭐⭐⭐⭐ (5 Estrellas)</option>
+                  <option value="4">⭐⭐⭐⭐ (4 Estrellas)</option>
+                  <option value="3">⭐⭐⭐ (3 Estrellas)</option>
+                  <option value="2">⭐⭐ (2 Estrellas)</option>
+                  <option value="1">⭐ (1 Estrella)</option>
+                </select>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                <label for="p-desc" style="font-size:0.85rem; font-weight:600;">Mini Descripción del Producto:</label>
+                <textarea id="p-desc" rows="2" placeholder="Ej: Chaqueta denim oversize con excelente acabado y comodidad." required></textarea>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                <label for="p-image" style="font-size:0.85rem; font-weight:600;">URLs de imágenes (Separa varias con comas):</label>
+                <input type="text" id="p-image" placeholder="Ej: enlace1, enlace2, enlace3" required />
+              </div>
+              <button type="submit" class="btn-submit" style="margin-top:10px;">Guardar Producto</button>
+            </form>
+          </div>
+        </div>
+      ` : ''}
 
       <!-- Menú Lateral Deslizante del Cliente (Drawer) -->
       ${showDrawer ? `
@@ -768,7 +878,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         </div>
       ` : ''}
 
-      <!-- Modal de Ayuda Elegante -->
+      <!-- Modal de Ayuda -->
       ${showHelpModal ? `
         <div class="client-drawer-overlay" id="help-modal-overlay">
           <div style="background:white; padding:30px; border-radius:12px; max-width:450px; width:90%; box-shadow:0 10px 30px rgba(61,49,42,0.2); text-align:left; position:relative; box-sizing:border-box;">
@@ -806,7 +916,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           
           <div class="navbar-actions">
             <button id="btn-toggle-currency" class="currency-toggle-btn" title="Cambiar Moneda">
-              ${currentCurrency === 'USD' ? ' $ USD (Cambiar a C$)' : ' C$ NIO (Cambiar a $)'}
+              ${currentCurrency === 'USD' ? '💱 $ USD (Cambiar a C$)' : '💱 C$ NIO (Cambiar a $)'}
             </button>
 
             ${currentUser ? `
@@ -838,7 +948,7 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
                 ${activeTab === 'dashboard' ? '🛒 Ver Catálogo' : '📊 Panel de Administración'}
               </button>
               <button id="btn-toggle-form" class="btn-subnav-action btn-add">
-                ${showForm ? '✕ Cerrar' : '+ Nuevo Producto'}
+                + Nuevo Producto
               </button>
             </div>
           </div>
@@ -910,62 +1020,60 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
           </div>
         ` : ''}
 
-        ${showForm && isAdmin ? `
-          <div class="form-container">
-            <h2>Añadir Nuevo Producto</h2>
-            <form id="add-product-form">
-              <input type="text" id="p-name" placeholder="Nombre del producto" required />
-              <input type="number" step="0.01" id="p-price" placeholder="Precio ($ USD)" required />
-              <input type="number" id="p-stock" placeholder="Cantidad en Stock (Ej: 15)" value="15" required />
-              <input type="text" id="p-sizes" placeholder="Tallas/Medidas (ej: 39, 40, 41 o S, M, L)" />
-              <input type="text" id="p-colors" placeholder="Colores (ej: Negro, Blanco, Café)" />
-              <select id="p-category">
-                <option value="Hombre">Hombre</option>
-                <option value="Mujer">Mujer</option>
-                <option value="Niños">Niños</option>
-                <option value="Zapatos">Zapatos</option>
-                <option value="Accesorios">Accesorios</option>
-              </select>
-              <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-                <label for="p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen (Google Drive o Web):</label>
-                <input type="text" id="p-image" placeholder="Ej: https://drive.google.com/file/d/..." required />
-              </div>
-              <button type="submit" class="btn-submit">Guardar Producto</button>
-            </form>
-          </div>
-        ` : ''}
-
         ${editingProduct && isAdmin ? `
-          <div class="form-container edit-container">
-            <h2>Editar Producto</h2>
-            <form id="edit-product-form">
-              <input type="text" id="edit-p-name" value="${editingProduct.name}" required />
-              <input type="number" step="0.01" id="edit-p-price" value="${editingProduct.price}" required />
-              <input type="number" id="edit-p-stock" value="${editingProduct.stock !== undefined ? editingProduct.stock : 15}" placeholder="Cantidad en Stock" required />
-              <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas / Medidas" />
-              <input type="text" id="edit-p-colors" value="${editingProduct.colors || ''}" placeholder="Colores" />
-              <select id="edit-p-category">
-                <option value="Hombre" ${editingProduct.category === 'Hombre' ? 'selected' : ''}>Hombre</option>
-                <option value="Mujer" ${editingProduct.category === 'Mujer' ? 'selected' : ''}>Mujer</option>
-                <option value="Niños" ${editingProduct.category === 'Niños' ? 'selected' : ''}>Niños</option>
-                <option value="Zapatos" ${editingProduct.category === 'Zapatos' ? 'selected' : ''}>Zapatos</option>
-                <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
-              </select>
-              <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
-                <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">URL de la imagen (Google Drive o Web):</label>
-                <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" required />
+          <div class="modal-backdrop-overlay" id="edit-product-modal-backdrop">
+            <div class="modal-content-box">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2>Editar Producto</h2>
+                <button id="btn-close-edit-modal" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">✕</button>
               </div>
-              <div style="display:flex; gap:10px; margin-top:10px;">
-                <button type="submit" class="btn-submit" style="flex:1;">Actualizar</button>
-                <button type="button" id="btn-cancel-edit" class="delete-btn" style="flex:1;">Cancelar</button>
-              </div>
-            </form>
+              <form id="edit-product-form">
+                <input type="text" id="edit-p-name" value="${editingProduct.name}" required />
+                <input type="number" step="0.01" id="edit-p-price" value="${editingProduct.price}" required />
+                <input type="number" id="edit-p-stock" value="${editingProduct.stock !== undefined ? editingProduct.stock : 15}" placeholder="Cantidad en Stock" required />
+                <input type="text" id="edit-p-sizes" value="${editingProduct.sizes || ''}" placeholder="Tallas / Medidas (Ej: 30,32 o 39,40)" required />
+                <input type="text" id="edit-p-colors" value="${editingProduct.colors || ''}" placeholder="Colores" />
+                <select id="edit-p-category">
+                  <option value="Hombre" ${editingProduct.category === 'Hombre' ? 'selected' : ''}>Hombre</option>
+                  <option value="Mujer" ${editingProduct.category === 'Mujer' ? 'selected' : ''}>Mujer</option>
+                  <option value="Niños" ${editingProduct.category === 'Niños' ? 'selected' : ''}>Niños</option>
+                  <option value="Zapatos" ${editingProduct.category === 'Zapatos' ? 'selected' : ''}>Zapatos</option>
+                  <option value="Accesorios" ${editingProduct.category === 'Accesorios' ? 'selected' : ''}>Accesorios</option>
+                </select>
+                <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                  <label for="edit-p-rating" style="font-size:0.85rem; font-weight:600;">Calificación (Estrellas de 1 a 5):</label>
+                  <select id="edit-p-rating">
+                    <option value="5" ${editingProduct.rating === 5 ? 'selected' : ''}>⭐⭐⭐⭐⭐ (5 Estrellas)</option>
+                    <option value="4" ${editingProduct.rating === 4 ? 'selected' : ''}>⭐⭐⭐⭐ (4 Estrellas)</option>
+                    <option value="3" ${editingProduct.rating === 3 ? 'selected' : ''}>⭐⭐⭐ (3 Estrellas)</option>
+                    <option value="2" ${editingProduct.rating === 2 ? 'selected' : ''}>⭐⭐ (2 Estrellas)</option>
+                    <option value="1" ${editingProduct.rating === 1 ? 'selected' : ''}>⭐ (1 Estrella)</option>
+                  </select>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                  <label for="edit-p-desc" style="font-size:0.85rem; font-weight:600;">Mini Descripción del Producto:</label>
+                  <textarea id="edit-p-desc" rows="2" placeholder="Mini descripción" required>${editingProduct.description || ''}</textarea>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:4px; text-align:left;">
+                  <label for="edit-p-image" style="font-size:0.85rem; font-weight:600;">URLs de imágenes (Separadas por comas):</label>
+                  <input type="text" id="edit-p-image" value="${editingProduct.image || ''}" required />
+                </div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                  <button type="submit" class="btn-submit" style="flex:1;">Actualizar</button>
+                  <button type="button" id="btn-cancel-edit" class="delete-btn" style="flex:1;">Cancelar</button>
+                </div>
+              </form>
+            </div>
           </div>
         ` : ''}
 
         <div class="product-grid" style="margin-top: 20px;">
           ${productsToDisplay.length > 0 ? productsToDisplay.map((p, index) => {
             const isFav = favoritesIds.includes(p.id);
+            const productRating = p.rating !== undefined ? p.rating : 5;
+            const productDesc = p.description || 'Diseño exclusivo, alta calidad y comodidad garantizada.';
+            const firstImg = p.image ? getImageUrl(p.image.split(',')[0].trim()) : '';
+
             return `
               <div class="product-card" style="position: relative;">
                 ${index < 3 && !showFavoritesView ? `<span style="position: absolute; top: 22px; left: 22px; background: #3d312a; color: white; font-size: 0.7rem; font-weight: bold; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; z-index: 2;">New</span>` : ''}
@@ -976,9 +1084,12 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
                   </button>
                 ` : ''}
 
-                <img src="${getImageUrl(p.image)}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
+                <img src="${firstImg}" alt="${p.name}" class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;" />
                 <h3 class="product-click-trigger" data-id="${p.id}" style="cursor:pointer;">${p.name}</h3>
-                <p class="category">${p.category}</p> <p class="price">${formatPrice(p.price)}</p>
+                <p class="category">${p.category}</p>
+                <div class="product-stars">${renderStars(productRating)}</div>
+                <p class="product-short-desc">${productDesc}</p>
+                <p class="price">${formatPrice(p.price)}</p>
                 
                 <div class="card-actions">
                   ${!isAdmin ? `
@@ -1150,6 +1261,18 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     applyFiltersAndRender();
   });
 
+  document.getElementById('btn-close-form-modal')?.addEventListener('click', () => {
+    showForm = false;
+    applyFiltersAndRender();
+  });
+
+  document.getElementById('add-product-modal-backdrop')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('add-product-modal-backdrop')) {
+      showForm = false;
+      applyFiltersAndRender();
+    }
+  });
+
   document.querySelector('#btn-toggle-cart')?.addEventListener('click', () => {
     showCart = !showCart;
     if (showCart) { showForm = false; editingProduct = null; }
@@ -1210,6 +1333,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         sizes: (document.querySelector('#p-sizes') as HTMLInputElement).value,
         colors: (document.querySelector('#p-colors') as HTMLInputElement).value,
         category: (document.querySelector('#p-category') as HTMLSelectElement).value,
+        rating: Number((document.querySelector('#p-rating') as HTMLSelectElement).value),
+        description: (document.querySelector('#p-desc') as HTMLTextAreaElement).value,
         image: (document.querySelector('#p-image') as HTMLInputElement).value
       };
 
@@ -1232,6 +1357,8 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
         sizes: (document.querySelector('#edit-p-sizes') as HTMLInputElement).value,
         colors: (document.querySelector('#edit-p-colors') as HTMLInputElement).value,
         category: (document.querySelector('#edit-p-category') as HTMLSelectElement).value,
+        rating: Number((document.querySelector('#edit-p-rating') as HTMLSelectElement).value),
+        description: (document.querySelector('#edit-p-desc') as HTMLTextAreaElement).value,
         image: (document.querySelector('#edit-p-image') as HTMLInputElement).value
       };
 
@@ -1241,6 +1368,18 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
     document.querySelector('#btn-cancel-edit')?.addEventListener('click', () => {
       editingProduct = null;
       applyFiltersAndRender();
+    });
+
+    document.getElementById('btn-close-edit-modal')?.addEventListener('click', () => {
+      editingProduct = null;
+      applyFiltersAndRender();
+    });
+
+    document.getElementById('edit-product-modal-backdrop')?.addEventListener('click', (e) => {
+      if (e.target === document.getElementById('edit-product-modal-backdrop')) {
+        editingProduct = null;
+        applyFiltersAndRender();
+      }
     });
   }
 
@@ -1319,9 +1458,9 @@ function renderApp(productsToDisplay: Product[], selectedCategory = 'Todos') {
   });
 }
 
-document.getElementById('close-detail-modal')?.addEventListener('click', closeProductDetail);
 document.getElementById('close-checkout-modal')?.addEventListener('click', closeCheckoutModal);
 
+// Cerrar modales al hacer clic fuera de la ventana blanca (fondo oscuro)
 window.addEventListener('click', (e) => {
   const detailModal = document.getElementById('product-detail-modal');
   const checkoutModal = document.getElementById('checkout-modal');
